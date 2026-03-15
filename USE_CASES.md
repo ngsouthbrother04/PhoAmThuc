@@ -1,4 +1,4 @@
-# USE_CASES
+# Use Cases
 
 > **Project**: Chùa Linh Ứng – Location-Based Auto-Narration System
 >
@@ -6,7 +6,7 @@
 >
 > **Purpose**: Define system use cases for academic submission, following the standard Use Case Report format.
 >
-> **Technical Context**: All use cases assume **React Native (Expo)** implementation with **Offline-First** architecture.
+> **Technical Context**: All use cases assume **React Native (Expo)** implementation with **Offline-first** architecture.
 
 ---
 
@@ -104,7 +104,7 @@
 |  | 4. System triggers TTS | `expo-speech.speak(text)` |
 
 ### Constraints
-- QR codes bypass Geofence checks but share the same Audio Engine state (Single Voice Rule).
+- QR codes bypass GPS sensing only, but still use the same Narration/Audio State Machine (Single Voice Rule).
 
 ---
 

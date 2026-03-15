@@ -1,3 +1,11 @@
+# Legacy Notice
+
+Tài liệu này là bản PRD cũ (monolithic) và đã được thay thế bởi bộ PRD tách file tại cùng thư mục.
+
+Vui lòng sử dụng điểm vào chính: [index.md](index.md).
+
+---
+
 ## 2. Product Requirements Document (PRD)
 
 ### 2.1 Problem Alignment
@@ -20,7 +28,7 @@
 ### 2.3 Payment Logic
 
 - Online: **VNPay (Default) hoặc Momo** (qua WebView redirect)
-- Offline: **Claim code / OTP** (mua vé tại quầy, nhập mã unlock)
+- Offline: **Claim Code / OTP** (mua vé tại quầy, nhập mã unlock)
 
 Flow:
 1. User quét QR
