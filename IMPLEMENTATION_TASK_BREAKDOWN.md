@@ -1,4 +1,4 @@
-# IMPLEMENTATION_TASK_BREAKDOWN
+# Implementation Task Breakdown
 
 Execution plan derived from SPEC_CANONICAL.md.
 
@@ -81,7 +81,7 @@ A2. Auth Endpoints
   2. Valid claim returns token payload expected by mobile.
 
 A3. Sync Endpoints
-- Goal: provide manifest and full content payload for one-load pattern.
+- Goal: provide manifest and full content payload for One-Load Pattern.
 - Tasks:
   1. Build manifest endpoint with contentVersion and checksum.
   2. Build full sync endpoint returning pois and tours payload.
@@ -174,7 +174,7 @@ B7. QR Manual Fallback
 - Tasks:
   1. Integrate camera scanning and QR parsing.
   2. Resolve poiId from SQLite.
-  3. Dispatch MANUAL_TRIGGER into same narration state machine.
+  3. Dispatch MANUAL_TRIGGER into same narration State Machine.
 - Depends on: B2, B5
 - Done when:
   1. QR bypasses GPS sensing only.
@@ -230,7 +230,7 @@ C4. Playback Controls
   3. Add skip behavior into cooldown path.
 - Depends on: B5
 - Done when:
-  1. UI controls reflect state machine truth.
+  1. UI controls reflect State Machine truth.
 
 C5. Tour List and Tour Detail
 - Goal: tour browsing and route display from SQLite.
@@ -351,7 +351,7 @@ Sprint candidate S1:
 5. B2 SQLite layer
 6. B3 Sync service
 7. B4 Geofence engine
-8. B5 Narration state machine
+8. B5 Narration State Machine
 9. D1 Core unit tests
 
 Sprint candidate S2:

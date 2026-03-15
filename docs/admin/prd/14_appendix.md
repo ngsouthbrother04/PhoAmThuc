@@ -16,7 +16,7 @@
 | **Ray-Casting Algorithm** | Thuật toán xác định điểm có nằm trong polygon không, bằng cách bắn tia ngang và đếm số lần tia cắt cạnh polygon. |
 | **TTS** (Text-to-Speech) | Công nghệ đọc văn bản thành giọng nói. MVP dùng `expo-speech` (on-device). |
 | **One-Load Pattern** | Chiến lược đồng bộ dữ liệu: tải toàn bộ dataset một lần duy nhất, lưu vào SQLite, và chỉ update khi `contentVersion` thay đổi. |
-| **Offline-First** | Nguyên tắc thiết kế: app phải hoạt động đầy đủ mà không cần internet sau lần sync đầu tiên. |
+| **Offline-first** | Nguyên tắc thiết kế: app phải hoạt động đầy đủ mà không cần internet sau lần sync đầu tiên. |
 | **Narration State Machine** | Máy trạng thái điều phối narration. Các state: IDLE → DETECTED → PLAYING → COOLDOWN → IDLE. |
 | **Cooldown** | Thời gian chờ sau khi rời POI để ngăn re-trigger cùng POI. Mặc định: 10 giây (theo trigger metadata). |
 | **Debounce** | Cơ chế lọc nhiễu GPS trước khi ENTER. Mặc định cần 3 điểm GPS liên tiếp bên trong polygon. |

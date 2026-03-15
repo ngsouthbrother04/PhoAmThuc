@@ -9,7 +9,7 @@
 | ID | Rule Name | Description | Impact |
 |----|-----------|-------------|--------|
 | BR-001 | Authentication Gate | Khách phải xác thực (thanh toán hoặc claim code) trước khi truy cập nội dung POI và tính năng GPS. Read-only map có thể xem trước mà không cần auth. | Bảo vệ nội dung premium; đảm bảo doanh thu |
-| BR-002 | Offline-First | Sau khi sync lần đầu, toàn bộ tính năng (GPS, narration, tour, map) phải hoạt động không cần internet. Không được gửi request API trong phiên tham quan. | Performance cao; phù hợp môi trường mạng yếu tại chùa |
+| BR-002 | Offline-first | Sau khi sync lần đầu, toàn bộ tính năng (GPS, narration, tour, map) phải hoạt động không cần internet. Không được gửi request API trong phiên tham quan. | Performance cao; phù hợp môi trường mạng yếu tại chùa |
 | BR-003 | Data Integrity | Quá trình sync dữ liệu phải là atomic — hoặc thành công hoàn toàn hoặc rollback. Không cho phép partial data trong SQLite. | Đảm bảo tính nhất quán; tránh crash do thiếu field |
 | BR-004 | Geofence Engine là Decision Core | Mọi quyết định khi nào bắt đầu/dừng narration phải đến từ Geofence Engine. GPS tracking KHÔNG ĐƯỢC trực tiếp trigger audio. | Tách biệt responsibility; dễ test và debug |
 | BR-005 | Stop-on-Exit Bắt buộc | Khi khách rời geofence POI, narration PHẢI dừng ngay lập tức. Không cho phép tiếp tục phát khi đã ra ngoài POI boundary. | Đảm bảo tính chính xác không gian — principle cốt lõi của hệ thống |

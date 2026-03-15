@@ -38,8 +38,8 @@
 ### 7.5 Security
 
 - **NFR-SEC-001:** AuthToken phải được lưu trong `expo-secure-store` (encrypted storage)
-- **NFR-SEC-002:** Claim code phải được validate phía server (không client-side mock)
-- **NFR-SEC-003:** Claim code chỉ được dùng một lần (server đánh dấu đã sử dụng)
+- **NFR-SEC-002:** Claim Code phải được validate phía server (không client-side mock)
+- **NFR-SEC-003:** Claim Code chỉ được dùng một lần (server đánh dấu đã sử dụng)
 - **NFR-SEC-004:** API calls phải dùng HTTPS
 - **NFR-SEC-005:** deviceId cho analytics phải là UUID ẩn danh, không liên kết với thông tin cá nhân
 

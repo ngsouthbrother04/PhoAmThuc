@@ -90,13 +90,13 @@ Nếu có xung đột giữa tài liệu, áp dụng thứ tự ưu tiên trong 
 1. Geofence là decision core cho luồng tự động theo GPS
 2. Stop-on-exit là bắt buộc
 3. Chỉ một narration tại một thời điểm
-4. QR là fallback thủ công, vẫn đi qua state machine
+4. QR là fallback thủ công, vẫn đi qua State Machine
 5. Debounce, cooldown, replay window phải giữ đúng default chuẩn
 
 **Yêu cầu thực thi:**
 
 1. Tách rõ geofence event và audio action — không trigger TTS trực tiếp từ GPS callback
-2. Update state machine đúng transition chuẩn
+2. Update State Machine đúng transition chuẩn
 3. Không sửa default timing nếu chưa có yêu cầu thay đổi spec
 4. Đối chiếu kết quả với test scenarios liên quan
 

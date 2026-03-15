@@ -15,7 +15,7 @@
 | R-005 | VNPay/Momo deep link không được app catch → stuck trong WebView | Medium | High | Timeout fallback 5 phút; nút "Kiểm tra trạng thái thanh toán" thủ công; webhook server-side để confirm |
 | R-006 | iOS background tracking restrictions thay đổi theo region | Low | Medium | Theo dõi Apple Developer documentation; functional testing trên nhiều iOS versions |
 | R-007 | Nhiều POI polygon gần nhau → user vào/ra liên tục nhiều POI | Medium | Medium | Cooldown mặc định 10s per POI (configurable theo trigger metadata); chỉ play POI mới nếu đã kết thúc POI cũ |
-| R-008 | Claim code hết hạn hoặc đã dùng → user bị chặn khỏi nội dung | Medium | High | Rõ ràng trong UI: "Mã không hợp lệ hoặc đã được sử dụng"; hướng dẫn liên hệ ban quản lý |
+| R-008 | Claim Code hết hạn hoặc đã dùng → user bị chặn khỏi nội dung | Medium | High | Rõ ràng trong UI: "Mã không hợp lệ hoặc đã được sử dụng"; hướng dẫn liên hệ ban quản lý |
 | R-009 | expo-speech trả lời không đồng nhất giữa iOS và Android | High | Medium | Wrap trong abstraction layer; unit test TTS layer riêng; UI fallback "Đọc bài thuyết minh" |
 | R-010 | App bị kill hoàn toàn trong lúc narration đang chạy | Medium | Low | Trạng thái PLAYING reset về IDLE khi re-launch; cooldown timer không persist qua app restart |
 

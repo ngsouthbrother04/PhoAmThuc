@@ -1,3 +1,5 @@
+# Test Scenarios
+
 ## 3. Test Scenarios
 
 ### Scenario 1 – Explore Mode
@@ -5,7 +7,7 @@
 #### 1. Thanh toán
 - App mở đúng ngôn ngữ thiết bị (To do)
 - User chọn thanh toán tiền mặt
-- Nhập Claim code / OTP từ nhân viên
+- Nhập Claim Code / OTP từ nhân viên
 - App chuyển sang màn hình bản đồ
 
 #### 2. Chọn ngôn ngữ

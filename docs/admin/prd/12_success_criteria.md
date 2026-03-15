@@ -15,7 +15,7 @@ Tất cả các mục dưới đây phải đạt ✅ trước khi Go Live:
 - [ ] User nhập claim code hợp lệ → vào được nội dung ngay lập tức
 - [ ] JWT token được lưu encrypted trong expo-secure-store
 - [ ] Token hết hạn → user bị đưa về màn hình Auth với thông báo rõ ràng
-- [ ] Claim code đã dùng → báo lỗi rõ ràng, không crash
+- [ ] Claim Code đã dùng → báo lỗi rõ ràng, không crash
 
 **GPS & Geofence Engine:**
 - [ ] Bật Location Permission → GPS bắt đầu tracking trong vòng 5 giây
@@ -28,7 +28,7 @@ Tất cả các mục dưới đây phải đạt ✅ trước khi Go Live:
 **QR Code:**
 - [ ] Quét QR code của POI → mở narration đúng nội dung
 - [ ] QR code không hợp lệ → thông báo lỗi user-friendly, không crash
-- [ ] QR mode hoạt động khi offline (POI data đã sync)
+- [ ] QR Mode hoạt động khi offline (POI data đã sync)
 
 **Language & Playback:**
 - [ ] Chuyển ngôn ngữ → narration tiếp theo dùng ngôn ngữ mới
@@ -61,8 +61,8 @@ Tất cả các mục dưới đây phải đạt ✅ trước khi Go Live:
 | Payment Flow | Test VNPay sandbox | Token nhận được, redirect đúng |
 | Claim Code | Valid và invalid codes | Correct success/error states |
 | Large Movement | Speed > 30km/h | No narration trigger |
-| Re-enter POI | Vào lại trong 60s cooldown | Không replay |
-| Re-enter POI | Vào lại sau 60s cooldown | Replay bình thường |
+| Re-enter POI | Vào lại trong 10s cooldown | Không re-trigger |
+| Re-enter POI | Vào lại sau 30s replay window | Replay bình thường |
 | App Kill + Reopen | Force kill app, relaunch | State reset sạch, không crash |
 
 **Automated Testing Targets:**

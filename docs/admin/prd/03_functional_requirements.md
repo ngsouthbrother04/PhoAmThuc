@@ -76,7 +76,7 @@
 
 **Description:** Tải toàn bộ dữ liệu POI về thiết bị sau xác thực thành công
 
-**Business Rule:** BR-002 (Offline-First), BR-003 (Data Integrity)
+**Business Rule:** BR-002 (Offline-first), BR-003 (Data Integrity)
 
 **Flow:**
 
@@ -117,7 +117,7 @@
 **Behavior:**
 
 - Yêu cầu permission `FOREGROUND_SERVICE` và `BACKGROUND_LOCATION` khi lần đầu
-- Nếu user từ chối permission → hiển thị hướng dẫn cấp quyền, chỉ hỗ trợ QR mode
+- Nếu user từ chối permission → hiển thị hướng dẫn cấp quyền, chỉ hỗ trợ QR Mode
 - Lưu path thưa (sparse) vào `AnalyticsBuffer` để upload sau
 
 ---

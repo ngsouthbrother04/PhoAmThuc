@@ -1,4 +1,4 @@
-# ARCHITECTURE & TECHNICAL BLUEPRINT
+# Architecture & Technical Blueprint
 
 > **Audience**: AI Agents, System Architects, Senior Developers
 >
@@ -8,7 +8,7 @@
 
 ## 1. System Topology
 
-The system operates as a **Hybrid Offline-First Mobile Architecture**.
+The system operates as a **Hybrid Offline-first Mobile Architecture**.
 
 ```mermaid
 graph TD
@@ -37,7 +37,7 @@ graph TD
 ## 2. Technology Stack & Libraries (STRICT)
 
 ### 2.1 Mobile Client (Consumer)
-- **Framework**: `React Native 0.74+` (Expo SDK 50+ Managed Workflow)
+- **Framework**: `React Native 0.81.x` (Expo SDK 54 Managed Workflow)
 - **Language**: TypeScript 5.0+
 - **Key Libraries**:
   - `expo-location`: Foreground & Background location tracking.
@@ -104,7 +104,7 @@ CREATE TABLE points_of_interest (
   name_jsonB JSONB NOT NULL, -- { "vi": "...", "en": "..." }
   description_jsonB JSONB NOT NULL, -- Narrations
   geom GEOMETRY(POLYGON, 4326) NOT NULL, -- Spatial Index
-  trigger_metadata JSONB DEFAULT '{"debounce": 5}'
+  trigger_metadata JSONB DEFAULT '{"debouncePoints": 3, "cooldownSeconds": 10, "replayWindowSeconds": 30}'
 );
 ```
 

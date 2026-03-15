@@ -1,4 +1,4 @@
-# EXECUTION_TODO_ISSUES
+# Execution TODO Issues
 
 Issue-style execution tracker mapped to current repository files.
 
@@ -230,7 +230,7 @@ Definition of done:
 Progress notes: none
 Last update: 2026-03-15
 
-### ISSUE-008 - Narration state machine and TTS service
+### ISSUE-008 - Narration State Machine and TTS service
 Status: TODO
 Priority: P0
 Sprint: S1
@@ -296,14 +296,14 @@ Dependencies: ISSUE-008
 AC mapping:
 - AC-008
 Scope:
-- Implement QR trigger through same narration state machine.
+- Implement QR trigger through same narration State Machine.
 Target files:
 - apps/mobile/App.tsx
 - apps/mobile/package.json
 Verify steps:
 1. Valid QR -> trigger narration
 2. Invalid QR -> hiển thị lỗi rõ ràng
-3. Đảm bảo qua cùng state machine
+3. Đảm bảo qua cùng State Machine
 Definition of done:
 1. QR bypasses GPS sensing only.
 2. Manual trigger uses same single-voice and interrupt logic.
@@ -419,7 +419,7 @@ Last update: 2026-03-15
 
 ## Sprint S3 (Quality + Hardening)
 
-### ISSUE-015 - Unit tests for geofence and state machine
+### ISSUE-015 - Unit tests for geofence and State Machine
 Status: TODO
 Priority: P1
 Sprint: S3

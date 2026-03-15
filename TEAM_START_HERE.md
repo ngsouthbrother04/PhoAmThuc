@@ -1,4 +1,4 @@
-# TEAM_START_HERE
+# Team Start Here
 
 Team-wide onboarding entrypoint for consistent AI-assisted development.
 

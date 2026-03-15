@@ -12,7 +12,7 @@
 
 | Layer | Technology | Reason |
 |-------|------------|--------|
-| Framework | React Native 0.74+ (Expo SDK 50+ Managed Workflow) | Cross-platform iOS/Android, Expo ecosystem |
+| Framework | React Native 0.81.x (Expo SDK 54 Managed Workflow) | Cross-platform iOS/Android, Expo ecosystem |
 | Language | TypeScript 5.0+ | Type safety, shared với backend |
 | Location | `expo-location` | Foreground & Background GPS |
 | Background Tasks | `expo-task-manager` | Geofence processing in background |

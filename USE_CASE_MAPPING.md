@@ -42,7 +42,7 @@
 ## Defense Notes (For Presentation)
 
 - **Technical Integrity**: All use cases map to specific Expo libraries (Location, Speech, SQLite).
-- **Offline-First**: UC1 ensures all data is available locally, enabling UC2-UC5 to function without network.
+- **Offline-first**: UC1 ensures all data is available locally, enabling UC2-UC5 to function without network.
 - **Traceability**: Every user action results in a measurable Architectural Event.
 
 ---

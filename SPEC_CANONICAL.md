@@ -1,4 +1,4 @@
-# SPEC_CANONICAL
+# Spec Canonical
 
 Single source of truth for implementation and AI code generation.
 
@@ -27,7 +27,7 @@ Correct narration at the correct physical location is more important than narrat
 
 1. QR is manual fallback trigger, not automatic location trigger.
 2. QR bypasses GPS sensing only.
-3. QR still uses Narration Engine state machine and single-voice/interrupt rules.
+3. QR still uses Narration Engine State Machine and single-voice/interrupt rules.
 4. QR is only for fixed POIs.
 
 ## 4. Canonical Runtime and Stack
@@ -97,7 +97,7 @@ Important:
 3. Never remove debounce/cooldown.
 4. Never assume always-online network.
 5. Never implement parallel narration for two POIs.
-6. For QR trigger, dispatch a manual narration event through the same state machine.
+6. For QR trigger, dispatch a manual narration event through the same State Machine.
 
 ## 10. Primary References
 

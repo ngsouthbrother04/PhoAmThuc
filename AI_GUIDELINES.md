@@ -1,4 +1,4 @@
-# AI_GUIDELINES
+# AI Guidelines
 
 > **Audience**: GitHub Copilot, AI Agents, Developers using AI assistance
 >
@@ -81,7 +81,7 @@ Disallowed:
 - QR codes are allowed ONLY as a fallback trigger
 - QR codes MUST NOT be associated with moving points (e.g., bus stops)
 - QR codes represent fixed, physical POIs
-- QR trigger is a **manual override path** and MUST still pass through the Narration Engine state machine (single voice + interrupt rules)
+- QR trigger is a **manual override path** and MUST still pass through the Narration Engine State Machine (single voice + interrupt rules)
 
 ---
 
@@ -123,7 +123,7 @@ When generating code or analysis, assume:
   - *Usage*: Caching recent queries, geofence data, session states.
 - **Offline DB**: **SQLite**.
   - *Usage*: Local mirror of POI content for offline narration.
-- **Relational DB**: ONLY use PostgreSQL if complex analytics/transactions strongly demand it.
+- **Relational DB policy**: PostgreSQL is the required relational database for this project (do not switch to another relational DB engine).
 
 ### 9.4 Payment Processing
 - **Gateways**: **VNPay** (Default) or **Momo**.
