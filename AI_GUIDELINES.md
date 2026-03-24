@@ -8,131 +8,86 @@
 
 ## 1. System Identity
 
-This project is a **Location-Based Auto-Narration System**.
+This project is a **Location-Based Food Narration System** (Phố Ẩm Thực).
 
 Core principle:
-> **Correct narration at the correct physical location is more important than narration completeness.**
+> **User-controlled food exploration is the priority.** Narration plays *only* when the user explicitly interacts with the app (Tap on Map POI or Scan QR).
 
 ---
 
-## 2. Non‑Negotiable Invariants (MUST)
+## 2. No Background GPS or Auto-Play
 
-AI-generated code **MUST always preserve** the following invariants:
-
-### 2.1 Geofence Engine = Decision Core
-- All **automatic location-based** decisions about *when* narration starts or stops originate from the **Geofence Engine**.
-- GPS tracking alone must **never** directly trigger audio playback.
-
-### 2.2 Narration Engine Responsibilities
-The Narration Engine MUST:
-- Maintain an **audio queue** (async-safe / multi-thread capable)
-- Support:
-  - `play`
-  - `stop-on-exit`
-  - `interrupt-on-enter-new-POI`
-- Prevent duplicate playback of the same POI
-
-### 2.3 Stop-on-Exit is Mandatory
-- If the user exits a POI geofence, narration MUST stop immediately.
-- It is invalid for narration to continue when the user is outside the POI boundary.
-
-### 2.4 Fast-Movement Handling
-- When `EXIT_POI_A` and `ENTER_POI_B` occur close in time:
-  - Audio for POI_A MUST be interrupted
-  - Audio for POI_B MUST start immediately (after debounce rules)
+- The system strictly avoids automatic audio triggers.
+- Background location tracking is REMOVED.
+- Geofences are REMOVED.
+- Do not implement ray-casting or complex geolocation math for triggers.
 
 ---
 
-## 3. Debounce & Cooldown Rules
-
-To prevent spam near geofence boundaries:
-- Rapid enter/exit events MUST be debounced
-- Cooldown MUST exist before re-triggering the same POI
-
-AI MUST NOT remove or weaken debounce/cooldown logic.
-
----
-
-## 4. Offline‑First Constraint
+## 3. Offline‑First Constraint
 
 - POI data and narration scripts MUST be available offline
 - **SQLite** (via expo-sqlite) is the REQUIRED local storage mechanism for POI Data
-- Network availability MUST NOT be assumed
+- Network availability MUST NOT be assumed during active exploration sessions.
 
 ---
 
-## 5. Analytics: No Vibe‑Coding
+## 4. Single Voice Rule
 
-AI-generated features MUST be **data-driven**.
-
-Allowed:
-- Heatmap generation
-- Time-listened metrics
-- POI popularity ranking
-
-Disallowed:
-- UX decisions based on intuition only
-- Heuristic changes without measurable metrics
+- The app MUST NEVER play two audio narrations at the same time.
+- Playing a new POI MUST immediately stop the previous audio before starting the new one.
 
 ---
 
-## 6. QR Code Usage Rules
+## 5. QR Code Usage Rules
 
-- QR codes are allowed ONLY as a fallback trigger
-- QR codes MUST NOT be associated with moving points (e.g., bus stops)
-- QR codes represent fixed, physical POIs
-- QR trigger is a **manual override path** and MUST still pass through the Narration Engine State Machine (single voice + interrupt rules)
+- QR codes represent fixed, physical Points of Interest (Food stalls).
+- QR trigger is a direct interaction path and MUST still pass through the Narration Engine State Machine (single voice rules).
 
 ---
 
-## 7. Explicit Non‑Goals (DO NOT)
+## 6. Explicit Non‑Goals (DO NOT)
 
 AI MUST NOT:
-- Allow narration outside POI boundaries
-- Bypass the Geofence Engine for automatic GPS flow
-- Remove analytics logging
-- Assume continuous internet connectivity
+- Implement any form of Geofencing or Auto-play audio.
+- Run continuous GPS tracking in the background.
+- Assume continuous internet connectivity.
 
 ---
 
-## 8. AI Prompt Hint
+## 7. AI Prompt Hint
 
 When generating code or analysis, assume:
 
-"This system prioritizes spatial correctness, interruption safety, offline availability, and analytics-based validation over continuous narration."
+"This system prioritizes explicit user interaction (Tap to Play), offline availability, and the strict Single Voice Rule over any form of automatic geographical triggers."
+
+### 7.3 Strict Unit Testing Mandate
+
+- **No Code Complete Without Tests**: Whenever you write a feature or refactor a logic block, you MUST immediately write or update the corresponding Unit Tests (e.g., using Jest for Mobile, or Vitest/Jest for Backend).
+- **Passing State**: You cannot mark a task as DONE unless the test suite passes locally.
+- **AAA Pattern**: Always use Arrange-Act-Assert.
 
 ---
 
-## 9. Technology Stack (MANDATORY)
+## 8. Technology Stack (MANDATORY)
 
-### 9.1 Mobile Application
-- **Framework**: React Native with **Expo managed workflow** (Default).
-- **Build Tool**: EAS Build (only if native modules are strictly required).
-- **Core Features**: Location services, Background tasks (expo-task-manager), **TTS (expo-speech)**, SQLite (expo-sqlite).
+### 8.1 Mobile Application
+- **Framework**: React Native with **Expo managed workflow**.
+- **Core Features**: Location mapping (foreground only), **Audio Player (expo-av)**, SQLite (expo-sqlite), **Offline File Caching (expo-file-system)**.
 
-### 9.2 Backend API
-- **Runtime**: Node.js 20+ + Express (TypeScript).
-- **Reasoning**: Lightweight, fast prototyping, shared language with mobile.
-- **Protocol**: REST API (primary).
+### 8.2 Backend API
+- **Runtime**: Node.js 20+ + Express (TypeScript). Monolith architecture.
+- **Protocol**: REST API.
+- **TTS Generation**: Backend calls Cloud TTS API (e.g., Google TTS) when Admin creates/updates a POI, saving audio files to storage. Do NOT use microservices.
 
-### 9.3 Database & Storage
+### 8.3 Database & Storage
 - **Primary DB**: **PostgreSQL** (SQL).
-  - *Extensions*: **PostGIS** (Required for geospatial logic).
-  - *Reason*: Strong relational data integrity, ERD support, and powerful geospatial queries.
 - **Cache**: **Redis**.
-  - *Usage*: Caching recent queries, geofence data, session states.
 - **Offline DB**: **SQLite**.
-  - *Usage*: Local mirror of POI content for offline narration.
-- **Relational DB policy**: PostgreSQL is the required relational database for this project (do not switch to another relational DB engine).
+- **File Storage**: Local FS or S3 for MP3 audio files.
 
-### 9.4 Payment Processing
+### 8.4 Payment Processing
 - **Gateways**: **VNPay** (Default) or **Momo**.
-- **Mobile Flow**: WebView (expo-web-browser) -> Redirect -> Deep Link Callback.
-- **Offline Flow**: One-time Claim Codes (OTP) verified against backend.
-
-### 9.5 Cloud Infrastructure
-- **Provider**: AWS / GCP / Azure (Flexible).
-- **Preference**: Managed Services (PaaS/SaaS) over raw VMs.
 
 ---
 

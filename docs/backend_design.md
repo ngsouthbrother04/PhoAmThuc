@@ -7,9 +7,9 @@
 - Ứng dụng: **Mobile App (React Native - Expo)**
 - Backend: **Node.js + Express (TypeScript)**
 - Database chính: **PostgreSQL** (with PostGIS)
-- Cache: **Redis** (Caching query, geofence data)
+- Cache: **Redis** (Caching query)
 - Database Offline (Mobile): **SQLite** (Content Layer sync)
-- Triển khai: **Cloud Managed Services** (AWS RDS / Azure Database for PostgreSQL)
+- Triển khai: **Cloud Managed Services**
 
 Hệ thống gồm 2 phân hệ chính:
 1. Mobile Navigation App (Expo)
@@ -19,34 +19,34 @@ Hệ thống gồm 2 phân hệ chính:
 
 ### 1.2 Data & Pipeline
 
-#### POI Data
-- Phục vụ **10 POI (phase hiện tại)**
+#### POI Quán Ăn Data
+- Phục vụ **10-50 POI quán ăn (phase hiện tại)**
 - Dữ liệu gồm:
-  - Text mô tả
-  - Toạ độ GPS
-  - Proximity range
-  - Ảnh thumbnail
+  - Text mô tả các món ăn, văn hóa
+  - Toạ độ GPS (latitude, longitude)
+  - Ảnh thumbnail, menu nổi bật
 
 #### Pipeline xử lý dữ liệu
 
 ```
 CMS / Admin Panel
-  → Backend API (Node.js)
-    → PostgreSQL (PostGIS)
-      → Mobile App sync (Offline SQLite)
+  → Backend API (Node.js) (Converts Text to Speech via Google TTS)
+    → Save MP3 to Storage (S3/Local)
+    → PostgreSQL (Saves audio_url and metadata)
+      → Mobile App sync (Offline SQLite & Media Cache)
 ```
 
-- Text POI được **dịch cho đúng 15 ngôn ngữ**
-- Audio: **Sinh realtime bằng On-device TTS**. Backend chỉ lưu trữ text content.
+- Text POI được **dịch cho 15 ngôn ngữ**
+- Audio: **Sinh ra tự động ở Backend qua Cloud TTS API** (như Google TTS) ngay khi Admin thêm/sửa quán ăn. Backend trả về danh sách `audio_url` cho Mobile. 
+- Mobile Client tải và phát file âm thanh thay vì tự sinh bằng on-device TTS.
 
 ---
 
 ### 1.3 Route & Navigation Logic
 
-- Mỗi bản đồ tour được biểu diễn bằng **Adjacency Matrix**
-- Các điểm POI custom được lưu trong database riêng
-- Thuật toán:
-  - **Shortest Path Algorithm** để tìm đường đi ngắn nhất giữa các POI
+- Mỗi bản đồ tour (Food Route) được biểu diễn bằng một danh sách có thứ tự `[poi_id_1, poi_id_2, ...]`.
+- Các điểm POI custom được lưu trong database riêng.
+- Truy vấn PostgreSQL + PostGIS cho các chức năng tìm kiếm quán ăn lân cận (Radius Search) thay vì đường đi ngắn nhất phức tạp.
 
 ---
 
@@ -55,8 +55,5 @@ CMS / Admin Panel
 - Công cụ:
   - Grafana
   - Prometheus
-  - Pushgateway
 - Theo dõi:
-  - Metric hệ thống mặc định
-  - Trạng thái container
-  - Hiệu năng backend
+  - Hiệu năng backend và tỷ lệ tải data thành công cho Client.

@@ -22,10 +22,10 @@ graph TD
         Sync["Data Sync Service"] -->|REST Fetch| API
         Sync -->|Write| LocalDB[("SQLite - Local Mirror")]
         
-        Geo[Geofencing Engine] -->|Read Polygons| LocalDB
-        Geo -->|Events| State[State Machine]
+        Map[Map Interaction Engine] -->|Read POIs| LocalDB
+        Map -->|User Tap Events| State[State Machine]
         
-        State -->|Trigger| TTS["TTS Engine (expo-speech)"]
+        State -->|Trigger| AudioPlayer["Audio Player (expo-av)"]
         State -->|Log| Analytics[Analytics Buffer]
         
         Analytics -->|Batch Upload| API
@@ -37,61 +37,63 @@ graph TD
 ## 2. Technology Stack & Libraries (STRICT)
 
 ### 2.1 Mobile Client (Consumer)
-- **Framework**: `React Native 0.81.x` (Expo SDK 54 Managed Workflow)
+- **Framework**: `React Native 0.81.x` (Expo SDK 54)
 - **Language**: TypeScript 5.0+
 - **Key Libraries**:
-  - `expo-location`: Foreground & Background location tracking.
-  - `expo-task-manager`: Background task orchestration.
-  - `expo-sqlite`: Local offline database (Content Layer).
-  - `expo-speech`: **Exclusive** audio output mechanism.
-  - `zustand`: Global state management (Session state, User preferences).
-  - `tanstack/react-query`: Server state & Sync logic.
+  - `expo-location`: Foreground location tracking (for blue dot only).
+  - `expo-sqlite`: Local offline database.
+  - `expo-av`: **Exclusive** audio playback mechanism for pre-generated audio files.
+  - `zustand`: Global state management.
+  - `react-native-maps`: Map display and POI marker interactions.
 
 ### 2.2 Backend API (Provider)
 - **Runtime**: `Node.js 20+`
-- **Framework**: `Express.js` (standard, lightweight)
-- **Language**: TypeScript
 - **Database**:
   - `PostgreSQL` + `PostGIS`: Stores POIs, Users, Telemetry, and Geospatial Data.
-  - **Schema Note**: POIs stored in `points_of_interest` table with `GEOMETRY(POLYGON, 4326)` column.
+  - **Storage**: AWS S3 or Local File System for storing generated `.mp3` audio files.
+- **Background Jobs**: Dedicated worker process/queue for TTS generation.
 
 ---
 
 ## 3. Component Deep-Dive
 
-### 3.1 The Geofence Engine (Core Logic)
-> **Constraint**: Must run in Foreground and Background.
+### 3.1 The Interactive Map Engine
+> **Constraint**: Handles displaying locations and routing taps to audio.
 
-- **Input**: Stream of `{ latitude, longitude, accuracy, speed }` from `expo-location`.
 - **Process**:
-  1. **Ray-Casting Algorithm**: Check if point is inside POI Polygon (fetched from SQLite).
-  2. **Debounce Filter**: Require N consecutive points inside polygon to trigger `ENTER`.
-  3. **Hysteresis**: Exit radius is slightly larger than Entry radius to prevent flickering.
-- **Output**: `GeofenceEvent { type: "ENTER" | "EXIT", poiId: string, timestamp: number }`
+  1. Renders `react-native-maps` using POI coordinates fetched from SQLite.
+  2. Tracks user location via `expo-location` in the foreground.
+  3. When a marker is tapped, displays the bottom sheet.
+  4. Dispatches an explicitly User-Triggered `PLAY_EVENT` to the State Machine when "Listen" is pressed.
 
 ### 3.2 The Narration State Machine
-> **Constraint**: Handles the "one voice at a time" rule.
+> **Constraint**: Handles the "Single Voice Rule".
 
 **States**:
-- `IDLE`: No active POI.
-- `DETECTED`: User entered POI, waiting for debounce/cooldown.
-- `PLAYING`: TTS is actively speaking.
-- `INTERRUPTED`: Fast movement caused stop; ready to switch.
-- `COOLDOWN`: User exited, blocking re-entry for X seconds.
+- `IDLE`: No active audio.
+- `PLAYING`: Audio file is actively playing.
+- `PAUSED`: User temporarily paused audio.
 
 **Transitions**:
-- `IDLE` -> `ENTER_EVENT` -> `DETECTED`
-- `DETECTED` -> `TIMER_EXPIRED` -> `PLAYING` (Trigger `expo-speech.speak()`)
-- `PLAYING` -> `EXIT_EVENT` -> `COOLDOWN` (Trigger `expo-speech.stop()`)
-- `PLAYING` -> `ENTER_NEW_POI` -> `INTERRUPTED` -> `PLAYING (New POI)`
+- `IDLE` -> `PLAY_EVENT(New POI)` -> `PLAYING`
+- `PLAYING` -> `PAUSE_EVENT` -> `PAUSED`
+- `PAUSED` -> `RESUME_EVENT` -> `PLAYING`
+- `PLAYING` / `PAUSED` -> `STOP_EVENT` -> `IDLE`
+- `PLAYING` -> `PLAY_EVENT(New POI)` -> `IDLE` (kills old audio) -> `PLAYING (New POI)`
 
-### 3.3 Data Synchronization (The "One-Load" Pattern)
-- **Trigger**: App Launch or Manual Refresh.
+### 3.3 Backend TTS Processing
+1. Admin creates or updates a POI with text descriptions in multiple languages.
+2. Backend triggers a background job (or synchronous flow if lightweight) calling a Cloud TTS API (e.g., Google TTS).
+3. Backend receives the generated `.mp3` files.
+4. Files are saved to S3/Local Storage.
+5. The `audio_url` is saved to the PostgreSQL database for each language.
+
+### 3.4 Data Synchronization (The "One-Load" Pattern)
 - **Flow**:
-  1. `GET /api/v1/sync/manifest`: Check Content Version.
-  2. Delta check: If ServerVersion > LocalVersion -> `GET /api/v1/sync/full`.
-  3. **Atomic Replace**: Transactionally wipe generic POI table in SQLite and populate with new JSON.
-  4. Narrations are stored as **Text Strings** in SQLite. Audio generation is strictly JIT (Just-in-Time).
+  1. `GET /api/v1/sync/manifest`
+  2. If ServerVersion > LocalVersion -> `GET /api/v1/sync/full`.
+  3. **Atomic Replace** in SQLite.
+  4. Audio files are downloaded/cached by the client for offline playback.
 
 ---
 
@@ -101,22 +103,24 @@ graph TD
 ```sql
 CREATE TABLE points_of_interest (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name_jsonB JSONB NOT NULL, -- { "vi": "...", "en": "..." }
-  description_jsonB JSONB NOT NULL, -- Narrations
-  geom GEOMETRY(POLYGON, 4326) NOT NULL, -- Spatial Index
-  trigger_metadata JSONB DEFAULT '{"debouncePoints": 3, "cooldownSeconds": 10, "replayWindowSeconds": 30}'
+  name_jsonb JSONB NOT NULL,
+  description_jsonb JSONB NOT NULL,
+  audio_urls_jsonb JSONB NOT NULL, -- { "vi": "url_to_mp3", "en": "url_to_mp3" }
+  latitude float8 NOT NULL,
+  longitude float8 NOT NULL,
+  type VARCHAR(50) NOT NULL
 );
 ```
 
 ### 4.2 Telemetry Packet
 ```typescript
 interface UserTelemetry {
-  deviceId: string; // Anonymized UUID
-  sessionPath: { lat: number; lng: number; timestamp: number }[]; // Sparse array
+  deviceId: string; 
   interactions: {
     poiId: string;
-    action: "ENTER" | "EXIT" | "LISTEN_COMPLETE" | "LISTEN_ABORT";
+    action: "PLAY" | "PAUSE" | "STOP";
     durationMs: number;
+    timestamp: number;
   }[];
 }
 ```
@@ -126,33 +130,22 @@ interface UserTelemetry {
 ## 5. Security & Payment Architecture
 
 ### 5.1 Payment Flow (Momo/VNPay)
-1. **Request**: Mobile App sends `OrderRequest` to Backend.
-2. **Sign**: Backend interacts with VNPay/Momo API, generates `paymentUrl`.
-3. **Web**: Mobile App opens `expo-web-browser` with `paymentUrl`.
-4. **Callback**:
-   - Success -> Backend receives Webhook -> Updates Ticket State in Postgres.
-   - Redirect -> Mobile App catches UUID deep link `chualinhung://payment-result?status=success`.
-
-### 5.2 Offline Auth (Claim Code)
-- **Algorithm**: `Bcrypt(Code + Salt)` stored in DB.
-- **Structure**: 6-digit alphanumeric.
-- **Validation**: Mobile sends code -> API verifies -> Returns `AuthToken` + `ContentPack`.
+1. Mobile App sends `OrderRequest`.
+2. Backend generates `paymentUrl`.
+3. Mobile App opens WebView.
+4. Deep link callback `phoamthuc://payment-result?status=success`.
 
 ---
 
 ## 6. Development Guidelines for Agents
 
 1. **When coding the Mobile App**:
-   - Always wrap `expo-speech` calls in a service that checks `AppState` (Foreground/Background).
-   - NEVER query the API for POI data during the navigation session; ONLY query SQLite.
+   - Audio is strictly triggered by UI buttons. Never by GPS coordinates.
+   - Use `expo-av` to play the pre-generated audio files.
+   - NEVER query the API for POI data during exploration.
 
 2. **When coding the Backend**:
-   - Endpoints must be stateless.
-   - The `/sync` endpoint must be highly optimized (compress response).
-
-3. **When modifying Geofence Logic**:
-   - Unit tests must simulate "Teleportation" (GPS Jump) and "Drift" (Stationary Jitter) to ensure robustness.
-
----
+   - Ensure the TTS generation does not block the main HTTP thread (use a simple worker queue or fast async await).
+   - Use a uniform naming convention for generated audio files.
 
 **End of ARCHITECTURE**

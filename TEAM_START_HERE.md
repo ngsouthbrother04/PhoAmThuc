@@ -6,27 +6,17 @@ This file is intentionally short. All AI agents should read the same documents i
 
 ## Read Order (Mandatory)
 
-1. SPEC_CANONICAL.md
-2. docs/user/prd/index.md
-3. IMPLEMENTATION_TASK_BREAKDOWN.md
-4. EXECUTION_TODO_ISSUES.md
-5. docs/test_scenarios.md
+1. README.md
+2. TEAM_START_HERE.md
+3. SPEC_CANONICAL.md
+4. MASTER_INDEX.md
 
 ## Working Rules
 
-1. Do not change behavior defaults (debounce/cooldown/state transitions) without updating SPEC_CANONICAL.md first.
-2. Treat docs/user/prd as canonical PRD content.
-3. Keep docs/admin/prd synchronized 1:1 with docs/user/prd.
-4. Use EXECUTION_TODO_ISSUES.md as implementation tracker.
+1. Do not change behavior defaults (single voice rule/state transitions) without updating README.md and SPEC_CANONICAL.md first.
+2. Treat docs/prd as canonical PRD content.
+3. Use EXECUTION_TODO_ISSUES.md as implementation tracker.
+4. **Unit Tests are Mandatory**: A feature is NOT done until tests are written and pass successfully.
 
-## Consistency Check
-
-Run this before raising PRs that touch PRD docs:
-
-```bash
-npm run docs:check-prd-sync
-```
-
-## If Conflicts Are Found
-
-Use conflict resolution order from SPEC_CANONICAL.md.
+## Setup
+App strictly avoids geofencing and automatic GPS playback. Read the docs to understand the Tap-to-play constraint.

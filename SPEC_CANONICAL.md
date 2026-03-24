@@ -4,73 +4,67 @@ Single source of truth for implementation and AI code generation.
 
 Status: active
 Version: 1.0
-Last updated: 2026-03-15
+Last updated: 2026-03-24
 
 ## 1. Product Identity
 
-Location-Based Auto-Narration System for Chua Linh Ung.
+Location-Based Food Narration System (Phố Ẩm Thực).
 
 Core principle:
-Correct narration at the correct physical location is more important than narration completeness.
+User-controlled food exploration is the priority. Narration plays ONLY when the user explicitly interacts (Tap/QR).
 
 ## 2. Non-Negotiable Invariants
 
-1. Geofence Engine is decision core for automatic location-based narration.
-2. GPS tracking alone never triggers audio directly.
-3. Stop-on-exit is mandatory.
-4. Single voice rule: only one narration at a time.
-5. Fast movement handling: EXIT_POI_A then ENTER_POI_B must interrupt A and prioritize B.
-6. Offline-first after first successful sync.
-7. Analytics logging must not be removed.
+1. User UI Interaction (Tap/QR) is the ONLY trigger for narration.
+2. GPS tracking alone NEVER triggers audio directly.
+3. Single voice rule: strictly one narration at a time. Previous stops when new starts.
+4. Background Location is forbidden. GPS is foreground only.
+5. Offline-first after first successful sync.
+6. Analytics logging must not be removed.
 
-## 3. QR Fallback Semantics
+## 3. QR Semantics
 
-1. QR is manual fallback trigger, not automatic location trigger.
-2. QR bypasses GPS sensing only.
-3. QR still uses Narration Engine State Machine and single-voice/interrupt rules.
-4. QR is only for fixed POIs.
+1. QR is a direct trigger.
+2. QR uses Narration Engine State Machine and single-voice rules.
 
 ## 4. Canonical Runtime and Stack
 
 Mobile:
 - React Native with Expo managed workflow
 - TypeScript
-- expo-location
-- expo-task-manager
-- expo-speech
+- expo-location (Foreground only)
+- expo-av (Audio File Playback)
+- expo-file-system (Audio caching)
 - expo-sqlite
 - zustand
-- tanstack/react-query
+- react-native-maps
 
 Backend:
 - Node.js 20+
 - Express + TypeScript
-- PostgreSQL + PostGIS
+- PostgreSQL 
 - Redis
+- Google Cloud TTS API (or similar free tier API)
+- Storage (Local/S3 for audio files)
 
 ## 5. Canonical State Machine
 
 States:
 - IDLE
-- DETECTED
 - PLAYING
-- INTERRUPTED
-- COOLDOWN
+- PAUSED
 
 Transitions:
-- IDLE -> ENTER_EVENT -> DETECTED
-- DETECTED -> debounce_passed and no_cooldown -> PLAYING
-- DETECTED -> EXIT_EVENT before debounce -> IDLE
-- PLAYING -> EXIT_EVENT -> COOLDOWN
-- PLAYING -> ENTER_NEW_POI -> INTERRUPTED -> PLAYING(new POI)
-- COOLDOWN -> timer_expired -> IDLE
+- IDLE -> PLAY_EVENT -> PLAYING
+- PLAYING -> PAUSE_EVENT -> PAUSED
+- PAUSED -> RESUME_EVENT -> PLAYING
+- PLAYING/PAUSED -> STOP_EVENT -> IDLE
+- PLAYING -> PLAY_EVENT(New POI) -> IDLE (Stop active) -> PLAYING
 
 ## 6. Canonical Timing Defaults
 
-1. Debounce ENTER default: 3 consecutive GPS points inside polygon.
-2. Geofence cooldown default: 10 seconds (from trigger metadata).
-3. Replay window (anti-duplicate narration) default: 30 seconds.
-4. Fast movement window: 3 seconds between EXIT_POI_A and ENTER_POI_B.
+1. Tap Response: < 500ms bottom sheet opening.
+2. Audio Start: < 1-2s after pressing "Nghe thuyết minh".
 
 ## 7. Canonical Data Naming
 
@@ -81,43 +75,73 @@ Mobile offline mirror table:
 - pois
 
 Important:
-- Do not rename these without migration plan and cross-doc updates.
+- Do not rename these without migration plan.
 
 ## 8. Sync Contract
 
 1. App launch or manual refresh checks sync manifest.
 2. If server version is newer, perform full sync.
 3. SQLite write must be atomic replace.
-4. Navigation session reads POI content from SQLite only.
+4. Exploration session reads POI content from SQLite only.
 
 ## 9. Implementation Guardrails for AI Codegen
 
-1. Never bypass Geofence Engine in automatic GPS flow.
-2. Never continue narration outside POI boundary.
-3. Never remove debounce/cooldown.
-4. Never assume always-online network.
-5. Never implement parallel narration for two POIs.
-6. For QR trigger, dispatch a manual narration event through the same State Machine.
+1. Never implement Geofence or background location tracking.
+2. Never auto-play audio.
+3. Never assume always-online network. (Audio files must be cached for offline play).
+4. Never implement parallel narration for two POIs (strict Single Voice).
+5. Do NOT introduce microservices or event-driven frameworks (Kafka/RabbitMQ) for TTS generation. Keep it simple in the monolith backend.
+6. **Strict Testing Requirement**: A feature is NOT complete until comprehensive Unit Tests are written and passing. Do not propose opening a PR or moving to the next task if tests are missing or failing.
 
 ## 10. Primary References
 
+- Source of Truth: README.md
 - AI invariants: AI_GUIDELINES.md
 - System architecture: ARCHITECTURE.md
-- Use cases: USE_CASES.md
-- Mapping: USE_CASE_MAPPING.md
-- Implementation breakdown: IMPLEMENTATION_TASK_BREAKDOWN.md
-- User PRD index: docs/user/prd/index.md
-- Backend design: docs/backend_design.md
-- Test scenarios: docs/test_scenarios.md
+- User PRD index: docs/prd/index.md
 
 ## 11. Conflict Resolution Rule
 
 If documentation conflicts:
-1. SPEC_CANONICAL.md (this file)
-2. AI_GUIDELINES.md
-3. ARCHITECTURE.md
-4. docs/user/prd/*
-5. USE_CASES.md and USE_CASE_MAPPING.md
-6. README.md
+1. **README.md (Absolute Source of Truth)**
+2. SPEC_CANONICAL.md (this file)
+3. AI_GUIDELINES.md
+4. ARCHITECTURE.md
+5. docs/prd/* (bao gồm cả 15_admin_requirements.md)
 
-When updating behavior or defaults, update this file first, then propagate to dependent docs and code.
+## 12. Admin CMS Rules (Canonical for Backend & AI Codegen)
+
+**Scope:** Admin Dashboard là **Web CMS riêng** (không nằm trong Mobile App).  
+Tất cả codegen liên quan đến Admin phải tuân thủ các invariant sau:
+
+### 12.1 Non-Negotiable Admin Invariants
+1. **TTS Generation is Server-Side Only**  
+   - Khi Admin Create/Edit POI → Backend **phải** trigger background job gọi Google Cloud TTS (hoặc tương đương) để sinh file MP3 cho **15 ngôn ngữ**.  
+   - Mobile App **không bao giờ** sinh TTS (expo-speech chỉ dùng để playback file đã có sẵn).
+
+2. **Atomic Publish Flow**  
+   - Thay đổi POI/Tour chỉ được áp dụng khi Admin nhấn **“Publish”**.  
+   - Chỉ lúc này `contentVersion` mới tăng và Sync Manifest được cập nhật.  
+   - Trước Publish, mobile app vẫn thấy version cũ.
+
+3. **Audio & Media Handling**  
+   - Image upload → AWS S3/CDN (theo 10_technical_constraints.md).  
+   - Audio files lưu dưới dạng `audioUrls` JSONB trong bảng `points_of_interest`.  
+   - Có nút “Regenerate Audio” cho từng POI (chỉ regenerate ngôn ngữ bị thay đổi nếu có thể).
+
+4. **No Impact on Mobile Invariants**  
+   - Admin CRUD **không được** thay đổi bất kỳ quy tắc nào của User:  
+     - Single Voice Rule  
+     - User-Trigger only (Tap/QR)  
+     - Offline-first  
+     - Foreground GPS only  
+   - Backend chỉ cung cấp data; mobile vẫn đọc từ SQLite Mirror.
+
+### 12.2 Reference
+- Chi tiết đầy đủ Admin Requirements: `docs/prd/15_admin_requirements.md`
+- Backend implementation phải tuân thủ `ARCHITECTURE.md §3.4` (TTS background job) và `backend_design.md §1.2`.
+
+**AI Codegen Guardrail:**  
+Khi AI sinh code cho backend (Express routes, TTS worker, Admin controllers), **bắt buộc** kiểm tra lại 12.1 trước khi hoàn thành.
+
+When updating behavior or defaults, align with README.md first.

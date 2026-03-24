@@ -1,85 +1,80 @@
-# Phân Công Công Việc Cho 4 Nhánh GitHub
+# Phân Công Danh Sách Công Việc (Sprints & Branches)
 
-## 1. Căn cứ phân công
-Phân công này được lập dựa trên các tài liệu chuẩn của dự án:
-- `SPEC_CANONICAL.md` (invariant và timing mặc định)
-- `IMPLEMENTATION_TASK_BREAKDOWN.md` (workstream và milestone)
-- `EXECUTION_TODO_ISSUES.md` (issue, dependencies, story points)
-- `docs/user/prd/04_acceptance_criteria.md` và `docs/test_scenarios.md` (tiêu chí nghiệm thu)
+> **Dự án:** Phố Ẩm Thực – Mapped Food Narration System  
+> **Kiến trúc:** Monolith (Node.js/Express) + Mobile (React Native/Expo) + Web CMS (React)
 
-Nguyên tắc:
-1. Ưu tiên chia đều khối lượng theo story points.
-2. Tôn trọng dependencies giữa các issue để tránh block chéo.
-3. Mỗi nhánh có owner chính, các nhánh khác review chéo theo mốc.
-
-## 2. Mapping người phụ trách theo nhánh
-- Người 1: nhánh `3122410411`
-- Người 2: nhánh `3122410452`
-- Người 3: nhánh `3122410466`
-- Người 4: nhánh `3122560001`
-
-## 3. Bảng phân công chính (cân bằng khối lượng)
-
-| Nhánh | Người phụ trách | Issue được giao | Tổng SP | Ghi chú phụ thuộc chính |
-|---|---|---|---:|---|
-| `3122410411` | Người 1 | ISSUE-010, ISSUE-012, ISSUE-013, ISSUE-015 | 23 | Trục mobile feature + unit test lõi geofence/state machine |
-| `3122410452` | Người 2 | ISSUE-004, ISSUE-005, ISSUE-006, ISSUE-009, ISSUE-016 | 21 | Phụ thuộc ISSUE-003 (sync), ISSUE-008 (fast movement), ISSUE-010/012/013/014 (integration test) |
-| `3122410466` | Người 3 | ISSUE-007, ISSUE-008, ISSUE-011 | 21 | Trục geofence + Narration State Machine, sau đó analytics local buffer |
-| `3122560001` | Người 4 | ISSUE-001, ISSUE-002, ISSUE-003, ISSUE-014, ISSUE-017 | 20 | Chỉ backend: nền tảng API, auth/sync, analytics integration, hardening |
-
-Phân bổ SP: `23 / 21 / 21 / 20` (độ lệch nhỏ, chấp nhận được).
-
-## 4. Kế hoạch chạy theo Sprint để giảm block
-
-### Sprint S1 (P0 Foundation)
-- Nhánh `3122410411`: Chuẩn bị khung QR/playback/tour (không phá invariant), chờ ISSUE-008 ổn định để vào S2
-- Nhánh `3122410452`: ISSUE-004, ISSUE-005, ISSUE-006
-- Nhánh `3122410466`: ISSUE-007, ISSUE-008
-- Nhánh `3122560001`: ISSUE-001, ISSUE-002, ISSUE-003
-
-Gate cuối S1:
-1. API auth/sync chạy được, schema ổn.
-2. SQLite local hoạt động và sync offline-first pass.
-3. Geofence phát event ổn định, Narration State Machine chạy đúng các state chính.
-
-### Sprint S2 (P0 Completion + P1 Core UX)
-- Nhánh `3122410411`: ISSUE-010, ISSUE-012, ISSUE-013
-- Nhánh `3122410466`: ISSUE-011
-- Nhánh `3122410452`: ISSUE-009
-- Nhánh `3122560001`: ISSUE-014
-
-Gate cuối S2:
-1. QR fallback đi qua cùng State Machine.
-2. Fast movement xử lý đúng ưu tiên POI_B.
-3. Language/playback/tour chạy ổn trên dữ liệu SQLite.
-4. Analytics local + batch API thông suốt.
-
-### Sprint S3 (Quality + Hardening)
-- Nhánh `3122410411`: ISSUE-015
-- Nhánh `3122410452`: ISSUE-016
-- Nhánh `3122560001`: ISSUE-017
-- Nhánh `3122410466`: hỗ trợ fix bug và review test coverage cho ISSUE-015/016
-
-Gate cuối S3:
-1. Unit + integration + scenario test pass.
-2. Checklist hiệu năng và release được xác nhận.
-
-## 5. Quy ước phối hợp để code không lệch docs
-1. Không đổi behavior default nếu chưa cập nhật `SPEC_CANONICAL.md` trước.
-2. Mọi PR phải ghi rõ mapping AC đã pass/chưa pass.
-3. Khi sửa PRD user thì đồng bộ PRD admin và chạy `npm run docs:check-prd-sync`.
-4. Các issue có dependency chỉ được merge khi issue tiền đề đã merge vào `main` (hoặc branch tích hợp được team thống nhất).
-
-## 6. Danh sách AC/test ưu tiên review chéo
-- Review chéo bắt buộc giữa nhánh `3122410466` và `3122410411` cho các luồng: geofence, stop-on-exit, single voice, QR fallback.
-- Review chéo giữa nhánh `3122560001` và `3122410452` cho các luồng: auth/sync/offline bootstrap.
-- Dùng `docs/test_scenarios.md` làm checklist smoke test trước khi mở PR.
-
-## 7. Gợi ý nhịp merge thực tế
-1. Merge cụm nền tảng S1 trước (001-008).
-2. Merge cụm tính năng S2 theo thứ tự: 009 -> 010/012/013 -> 011 -> 014.
-3. Cuối cùng merge cụm S3: 015 -> 016 -> 017.
+Tài liệu này định nghĩa rõ ràng phạm vi công việc, trách nhiệm và tính năng phát triển cho từng thành viên trong nhóm 4 người dựa trên các tài liệu `SPEC_CANONICAL.md`, `ARCHITECTURE.md` và `15_admin_requirements.md`.
 
 ---
 
-Nếu cần, có thể tách thêm thành file `TASK_BOARD.md` để theo dõi tiến độ hằng ngày theo trạng thái `TODO / IN_PROGRESS / IN_REVIEW / QA / DONE` cho từng nhánh.
+## 1. Mapping Nhánh & Vai trò (Cốt lõi)
+
+Theo đúng yêu cầu tổ chức dự án, 4 nhánh được phân bổ như sau:
+
+- **Nhánh `3122560001`**: Backend Core (API, Cơ sở dữ liệu, Xác thực, Sync Data)
+- **Nhánh `3122410411`**: Backend Features (Google Cloud TTS, Lưu trữ Audio, Batch Analytics, Storage)
+- **Nhánh `3122410452`**: Mobile App (Bản đồ màn hình chính, Bản đồ Tour, Play Audio, Offline Sync)
+- **Nhánh `3122410466`**: Web Admin CMS (Quản lý Quán ăn, Chạy TTS thủ công, Xem biểu đồ tương tác)
+
+---
+
+## 2. Chi tiết công việc từng Nhánh
+
+### 🌍 Nhánh 1: `3122560001` - Backend Core (Cấu trúc & Dữ liệu nền tảng)
+**Trách nhiệm chính:** Thiết kế Schema Database (PostgreSQL), cung cấp API xác thực, API đồng bộ nội dung (One-Load pattern) cho Mobile.
+
+**Nhiệm vụ cụ thể (Tasks):**
+- **DB-01:** Thiết kế & Migrate Schema Database (Tạo bảng `points_of_interest`, `tours`, `analytics_events`).
+- **AUTH-01:** Viết API Xác thực (`POST /api/v1/auth/claim` và `POST /api/v1/auth/payment/initiate`).
+- **SYNC-01:** Viết API `GET /api/v1/sync/manifest` (Trả về contentVersion hiện tại).
+- **SYNC-02:** Viết API `GET /api/v1/sync/full` (Trả về toàn bộ JSON data của POIs và Tours cho app tải về một lần duy nhất).
+- **CORE-01:** Quản lý Git merge conflict cho file `schema.prisma` hoặc config gốc của Backend.
+
+---
+
+### 🎙 Nhánh 2: `3122410411` - Backend Features (Audio Generation & Analytics)
+**Trách nhiệm chính:** Xử lý các logic nặng (Heavy processing) phía Backend, đặc biệt là tích hợp Text-To-Speech (sinh MP3) và thống kê dữ liệu.
+
+**Nhiệm vụ cụ thể (Tasks):**
+- **TTS-01:** Viết Background Job / Service tích hợp Google Cloud TTS API. Khi truyền vào 1 đoạn text và list language (15 ngôn ngữ) → Sinh ra file `.mp3`.
+- **STOR-01:** Viết module upload file `.mp3` và ảnh (Upload vào AWS S3 hoặc lưu Local File System), trả về URL cố định (`audioUrls`).
+- **ADMIN-API-01:** Viết API CRUD phục vụ Admin Web (Create/Edit POI, Tours). Tự động gọi Job TTS khi tạo/sửa POI.
+- **DATA-01:** Viết API `POST /api/v1/analytics/batch` hứng dữ liệu log từ Mobile gửi lên lưu vào bảng `analytics_events`.
+- **DATA-02:** Viết API thống kê (Aggregate) dữ liệu từ `analytics_events` phục vụ vẽ biểu đồ (Top POI, Tổng giờ nghe, Lọc theo ngày).
+
+---
+
+### 📱 Nhánh 3: `3122410452` - Mobile App (Frontend React Native & Bản đồ offline)
+**Trách nhiệm chính:** Phát triển từ đầu đến cuối ứng dụng cho User (Foodie), xử lý luồng Database Offline và Single Voice Rule. Không sử dụng Geofence.
+
+**Nhiệm vụ cụ thể (Tasks):**
+- **APP-01:** Dựng Shell Navigation & Màn hình Chào/Xác thực bằng Claim Code.
+- **SQLITE-01:** Dựng hệ thống Offline (expo-sqlite). Tự động gọi 2 hàm Sync của Backend để tải data lúc khởi động.
+- **MAP-01:** Màn hình chính Map (`react-native-maps`). Lấy data từ SQLite render Marker, hiển thị GPS xanh của user (Foreground). Tap Marker mở Bottom Sheet quán ăn.
+- **AUDIO-01:** Dựng **Nhà máy Trạng Thái Audio** (Audio Player State Machine bằng `expo-av`). Bấm "Nghe": Load file MP3 từ URL lưu sẵn, áp dụng chặt chẽ **Single Voice Rule** (Dừng bài cũ, phát bài mới).
+- **TOUR-01:** Màn hình "Tour Ẩm Thực". Cho phép chọn Tour -> quay lại bản đồ lọc hiển thị các quán trong Tour.
+- **LOG-01:** Cài đặt Buffer lưu log "Bắt đầu nghe", "Dừng nghe" vào db tạm, tự động upload khi có mạng.
+
+---
+
+### 💻 Nhánh 4: `3122410466` - Admin Web CMS (Vận hành & Dashboard)
+**Trách nhiệm chính:** Xây dựng cổng dữ liệu Web Panel cho Content Operator (User Admin) để xem biểu đồ và quản lý Quán ăn (Trigger AI Sinh Voice).
+
+**Nhiệm vụ cụ thể (Tasks):**
+- **CMS-01:** Xây dựng giao diện Web CMS (ReactJS / Next.js Admin template), trang Đăng nhập Admin.
+- **P-CRUD-01:** Form thêm/sửa Quán Ăn đa ngôn ngữ. Form này phải gọi *API của nhánh 3122410411* để sinh file Audio. Cung cấp nút `Regenerate Audio` (Sinh lại âm thanh).
+- **T-CRUD-01:** Màn hình quản lý Tour (Cho phép kéo thả hoặc chọn nhiều POI tạo thành tuyến).
+- **PUB-01:** Màn hình thiết lập hệ thống - Nút `Publish` để đẩy contentVersion mới cho Mobile Sync.
+- **DASH-01:** Dựng trang Analytics Dashboard hiển thị số lượng play, thời gian play, Top POI dưới dạng Biểu đồ (Sử dụng thư viện Chart.js hoặc Recharts). Cung cấp nút `Export CSV` cho thống kê.
+
+---
+
+## 3. Quản lý Rủi Ro Inter-Branch (Conflict chéo)
+
+| Risk | Giải pháp | Phụ trách kết nối |
+|------|----------|-------------------|
+| **Thay đổi Database Schema** | Giao kèo 100% bằng REST API. Không ai được tự sửa `schema.prisma` ngoại trừ chủ nhánh 3122560001 (Backend Core). | `3122560001` & `3122410411` |
+| **Giao tiếp TTS - Dashboard** | Giao diện nút *Tạo Audio* ở Web CMS gọi thẳng API của nhánh Backend Feature. Không encode audio ở Web. | `3122410411` & `3122410466` |
+| **Audio File & Mobile Player** | File sinh ra từ TTS phải là định dạng chuẩn (MP3) với URL public hoặc cached. Mobile dùng `expo-av` đọc thẳng URL lưu ở SQLite. | `3122410452` & `3122410411` |
+
+Tất cả các thành viên trước khi Pull Request phải xác nhận **[x] Đã chạy Unit Test** trên máy cá nhân mà không bị dính logic Geofencing rác rưởi của phiên bản cũ.

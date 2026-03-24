@@ -1,6 +1,6 @@
 # Use Cases
 
-> **Project**: Chùa Linh Ứng – Location-Based Auto-Narration System
+> **Project**: Phố Ẩm Thực – Mapped Food Narration System
 >
 > **Template Source**: Focused Use Cases (School of Computing)
 >
@@ -14,23 +14,25 @@
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
-| 2026-01-30 | 1.1 | Updated with Technical Realization (TTS/SQLite) | Antigravity |
+| 2026-03-24 | 2.0 | Shifted to Food Street Tap-to-Play Model | Antigravity |
 
 ---
 
 ## Table of Contents
 
 - UC1 – Access Application & Authorization
-- UC2 – Automatic POI Narration (Location-Based)
+- UC2 – Map-Based POI Narration (Tap-to-Play)
 - UC3 – Manual POI Activation (QR Code)
 - UC4 – Select Language & Playback Control
-- UC5 – View Tour & Auto-Guided Exploration
+- UC5 – View Food Tour & Exploration
 
 ---
 
+All narration, QR, and state-machine rules are governed by SPEC_CANONICAL.md.
+
 ## UC1 – Access Application & Authorization
 
-**Actor(s)**: Visitor
+**Actor(s)**: Foodie (Visitor)
 
 **Maturity**: Focused
 
@@ -40,47 +42,30 @@
 
 | Actor Action | System Response | Technical Realization |
 |-------------|----------------|-----------------------|
-| 1. Visitor opens the application | 2. System checks Auth State (Token validity) | `SecureStore` check |
-| 3. Visitor selects payment method (Momo/VNPay) or Claim Code | 4. System validates authorization | `Axios` call to Node.js Backend or `WebView` flow |
-| 5. Authorization successful | 6. **CRITICAL**: System syncs all POI data to local DB | Atomic Write to `SQLite` (Content Layer) |
-
-### Alternative Paths
-- A1: Invalid claim code → system requests re-entry (Validation via API)
-- A2: Offline mode active & Valid Token → Skip Payment, Go to Map (Load from `SQLite`)
-
-### Preconditions
-- Visitor has network access (for initial Sync only)
-
-### Postconditions
-- **Data Persistence**: All POI Vectors and Text Scripts are stored in `SQLite`.
-- **System State**: App enters `OfflineReady` state.
+| 1. Visitor opens the application | 2. System checks Auth State | `SecureStore` check |
+| 3. Visitor selects payment method or enters Code | 4. System validates authorization | `Axios` call to Node.js / `WebView` |
+| 5. Authorization successful | 6. **CRITICAL**: System syncs all POI data | Atomic Write to `SQLite` |
 
 ---
 
-## UC2 – Automatic POI Narration (Location-Based)
+## UC2 – Map-Based POI Narration (Tap-to-Play)
 
-**Actor(s)**: Visitor
+**Actor(s)**: Foodie
 
 **Maturity**: Focused
 
-**Summary**: System automatically generates speech when visitor enters a POI geofence.
+**Summary**: Visitor generates speech when tapping a specific POI marker on the map.
 
 ### Basic Course of Events
 
 | Actor Action | System Response | Technical Realization |
 |-------------|----------------|-----------------------|
-| 1. Visitor moves within the site | 2. System tracks GPS location | `expo-location` (High Accuracy) |
-| 3. Visitor enters POI geofence | 4. Geofence Engine matches coordinates | Ray-Casting Algorithm on `SQLite` Polygons |
+| 1. Visitor taps a POI Marker on the map | 2. System opens Bottom Sheet | `react-native-maps` onMarkerPress |
+| 3. Visitor taps "Nghe thuyết minh" | 4. Audio State Machine receives `PLAY` | State Machine transitioning to `PLAYING` |
 |  | 5. System generates Audio | `expo-speech.speak(text)` |
 
 ### Alternative Paths
-- A1: Visitor exits POI early → narration stops immediately (`expo-speech.stop()`)
-
-### Exception Paths
-- E1: GPS unstable → Debounce logic prevents false triggers (requires N stable points)
-
-### Preconditions
-- App has Location Permissions (Foreground & Background)
+- A1: Visitor plays another POI while one is already playing → Previous narration stops immediately (`expo-speech.stop()`), new one starts (Single Voice Rule).
 
 ### Postconditions
 - Events logged to `AnalyticsBuffer` (in-memory -> SQLite -> Batch Upload)
@@ -89,11 +74,11 @@
 
 ## UC3 – Manual POI Activation (QR Code)
 
-**Actor(s)**: Visitor
+**Actor(s)**: Foodie
 
 **Maturity**: Focused
 
-**Summary**: Visitor scans QR code to trigger TTS for a specific POI.
+**Summary**: Visitor scans QR code at the physical food stall to trigger TTS.
 
 ### Basic Course of Events
 
@@ -104,13 +89,13 @@
 |  | 4. System triggers TTS | `expo-speech.speak(text)` |
 
 ### Constraints
-- QR codes bypass GPS sensing only, but still use the same Narration/Audio State Machine (Single Voice Rule).
+- QR codes still use the Narration Audio State Machine (Single Voice Rule).
 
 ---
 
 ## UC4 – Select Language & Playback Control
 
-**Actor(s)**: Visitor
+**Actor(s)**: Foodie
 
 **Maturity**: Focused
 
@@ -121,28 +106,25 @@
 | Actor Action | System Response | Technical Realization |
 |-------------|----------------|-----------------------|
 | 1. Visitor selects language (e.g., KR) | 2. System updates Preference State | `Zustand` store update |
-|  | 3. TTS Engine switches Voice ID | `expo-speech` config (Use standard implementation for Locale) |
-| 3. Visitor presses Play/Pause | 4. TTS pauses/resumes | `expo-speech.pause()` / `resume()` |
-
-### Preconditions
-- Device supports requested TTS Locale (Fallback to English if missing)
+|  | 3. TTS Engine switches Voice ID | `expo-speech` config |
+| 3. Visitor presses Pause in Mini Player | 4. TTS pauses | `expo-speech.pause()` |
 
 ---
 
-## UC5 – View Tour & Auto-Guided Exploration
+## UC5 – View Food Tour & Exploration
 
-**Actor(s)**: Visitor
+**Actor(s)**: Foodie
 
 **Maturity**: Focused
 
-**Summary**: Visitor follows a predefined tour with automatic narration.
+**Summary**: Visitor explores a predefined food tour with markers filtered on map.
 
 ### Basic Course of Events
 
 | Actor Action | System Response | Technical Realization |
 |-------------|----------------|-----------------------|
-| 1. Visitor selects Tour mode | 2. System renders Tour Polyline | `react-native-maps` Polyline |
-| 3. Visitor moves along route | 4. Auto-Narration active | Inherits **UC2** logic |
+| 1. Visitor selects a Food Tour | 2. System filters Map to show only tour POIs | `react-native-maps` Markers |
+| 3. Visitor taps markers along route | 4. Narration plays | Inherits **UC2** logic |
 
 ---
 

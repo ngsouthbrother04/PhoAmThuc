@@ -8,92 +8,50 @@
 
 ### Phase 2 — v1.1–v1.2 (3–6 tháng sau launch)
 
-**17.1 High-Quality Pre-recorded Audio**
+**17.1 Đặt Món / Thanh toán Quán ăn**
 
-- Thay thế expo-speech (on-device TTS) bằng audio files MP3 được thu âm chuyên nghiệp
-- Mỗi POI × mỗi ngôn ngữ = 1 file audio
-- CDN streaming + local cache (không tải toàn bộ ngay)
-- Playback: react-native-track-player (seek, progress bar, real duration)
+- Tích hợp đặt món trước tại quán để tiết kiệm thời gian chờ đợi.
+- Chia sẻ hóa đơn nhóm.
 
-**17.2 Tour Progress & History**
+**17.2 Food Journey & Lịch sử**
 
-- Lưu lại các POI đã thăm trong session
-- "Bản đồ hành trình" hiển thị lộ trình đã đi
-- Badge/milestone khi hoàn thành 50%, 100% tour
-- Share lộ trình dưới dạng ảnh lên mạng xã hội
+- Lưu lại các quán ăn đã thưởng thức.
+- "Bản đồ hành trình" hiển thị những điểm ẩm thực đã chinh phục.
+- Log nhật ký (ăn ngon, ăn dở, món recommend).
 
-**17.3 Push Notifications**
+**17.3 Rating & Feedback**
 
-- Nhắc user khi có nội dung mới
-- "Hôm nay là ngày lễ X — hãy thăm điện Y để nghe thuyết minh đặc biệt"
-- Sử dụng expo-notifications + backend scheduling
-
-**17.4 Rating & Feedback**
-
-- Sau khi nghe narration xong → prompt 1 câu hỏi ngắn: "Bạn thấy nội dung này thế nào?"
-- Star rating per POI / per Tour
-- Free-text feedback (optional)
-- Admin dashboard hiển thị average rating
+- Chấm điểm từng món ăn hoặc quán ăn.
+- Review văn bản.
+- Admin dashboard hiển thị trending food.
 
 ---
 
 ### Phase 3 — v2.0 (6–12 tháng)
 
-**17.5 AI-Powered Q&A Chatbot**
+**17.4 AI-Powered Culinary Assistant chatbot**
 
-- User hỏi câu hỏi liên quan trong khoảng cách một POI
-- RAG (Retrieval-Augmented Generation) từ POI knowledge base
-- Multilingual: tự detect ngôn ngữ user gõ
-- Voice input (speech-to-text) + voice output (TTS)
+- User hỏi món nào ngon gần đây.
+- RAG (Retrieval-Augmented Generation) từ database quán ăn.
+- Tự động gợi ý món ăn theo khẩu vị cá nhân lúc onboarding.
 
-**17.6 AR Navigation (Augmented Reality)**
+**17.5 Offline Map Tiles**
 
-- Dùng camera phone hiển thị arrow/label overlay chỉ hướng đến POI tiếp theo
-- Dùng ARKit (iOS) / ARCore (Android) qua expo-modules
-- POI labels float trong không gian 3D
-- Ngưỡng kích hoạt: khi user còn cách POI <50m
-
-**17.7 Offline Map Tiles**
-
-- Download tile package cho khu vực chùa Linh Ứng trước khi đến
-- Dùng Mapbox SDK offline maps
-- Map hiển thị đầy đủ không cần internet
-
-**17.8 Multi-day Visit Support**
-
-- Token (vé) có hiệu lực 3 ngày thay vì 1 ngày
-- Resume tour từ lần dừng cuối (persistent progress)
-- Lịch khai giảng, lịch lễ, sự kiện tích hợp trong app
+- Download tile package bản đồ cho khu phố trước khi đến.
+- Map hiển thị đường phố chi tiết offline.
 
 ---
 
 ### Phase 4 — v3.0 (12–24 tháng)
 
-**17.9 Multi-venue Support**
+**17.6 Multi-Street Support**
 
-- Mở rộng ngoài chùa Linh Ứng → Ngũ Hành Sơn, chùa Cầu Hội An, v.v.
-- Venue selection screen khi mở app
-- Admin multi-venue management
-- Revenue sharing model per venue
+- Mở rộng ra các tuyến phố ẩm thực lớn: Chợ Đêm Đà Lạt, Tạ Hiện (Hà Nội), Bùi Viện (TP HCM).
+- Giao diện chọn khu vực khi mở app.
+- Revenue sharing model với ban quản lý chợ/phố.
 
-**17.10 Wearable Companion App**
+**17.7 Social & Gamification**
 
-- Apple Watch / Wear OS companion
-- Vibration alert khi approach POI
-- Mini player controls (Play/Pause) trên wrist
-- Map glance với current location
-
-**17.11 Accessibility Mode**
-
-- VoiceOver (iOS) / TalkBack (Android) full compatibility
-- Large text mode tự động detect từ OS settings
-- High contrast mode
-- Narration speed control (0.5x — 2.0x)
-- Screen color filter cho người color-blind
-
-**17.12 Social & Gamification**
-
-- "Tour Challenge": hoàn thành X POI trong Y giờ
-- Leaderboard per venue
-- NFT certificates / digital souvenirs khi complete full tour
-- Friend tracking: thấy bạn bè đang ở đâu trong map
+- "Thử thách ẩm thực": Ăn thử 5 món đặc trưng trong 2 giờ.
+- Leaderboard theo cấp độ "Thực thần".
+- Friend tracking: Rủ bạn bè cùng đi ăn và xem vị trí nhau trên map hẹn.

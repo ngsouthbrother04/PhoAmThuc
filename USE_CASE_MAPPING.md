@@ -11,20 +11,20 @@
 | Use Case | Test Scenario (Kịch bản test) | Architecture Component (Specific Libs) |
 |---------|------------------------------|----------------------------------------|
 | UC1 – Access Application | Scenario 1 – Thanh toán | **AuthModule** (`SecureStore`, `WebView`), **DataSync** (`Axios`, `SQLite`) |
-| UC2 – Automatic POI Narration | Scenario 2 – Bắt đầu tour | **LocationService** (`expo-location`), **GeofenceEngine** (Ray-Casting), **TTSEngine** (`expo-speech`) |
-| UC3 – Manual POI Activation | Scenario 1 – Chọn POI | **QRHandler** (`expo-camera`), **TTSEngine** (`expo-speech`) |
+| UC2 – Map-Based POI Narration | Scenario 1 – Tương tác Tap-to-Play | **MapEngine** (`react-native-maps`), **TTSEngine** (`expo-speech`) |
+| UC3 – Manual POI Activation | Scenario 1 – Chọn POI qua mã QR | **QRHandler** (`expo-camera`), **TTSEngine** (`expo-speech`) |
 | UC4 – Language & Playback | Scenario 1 – Chọn ngôn ngữ, Play/Pause | **TTSEngine** (`expo-speech`), **PreferencesStore** (`Zustand`) |
-| UC5 – Tour Exploration | Scenario 2 – Chế độ tour | **MapModule** (`react-native-maps`), **RouteLogic** (Dijkstra/Graph) |
+| UC5 – Food Tour Exploration | Scenario 2 – Lộ trình Ẩm thực | **MapModule** (`react-native-maps` Filtering) |
 
 ---
 
 ## Architectural Trace Examples
 
-### UC2 – Automatic POI Narration
+### UC2 – Map-Based POI Narration
 
-- **Trigger**: `ENTER_POI` event from Geofence Engine.
-- **Decision**: Geofence Engine (Ray-casting on SQLite Polygons).
-- **Execution**: Narration Engine (State Machine: `IDLE` -> `DETECTED` -> `PLAYING`).
+- **Trigger**: `TAPPED_POI_LISTEN` event from Map Engine popup.
+- **Decision**: User Interface Map marker selection.
+- **Execution**: Narration Engine (State Machine: `IDLE` -> `PLAYING`).
 - **Output**: `expo-speech.speak()` (Text from SQLite).
 - **Logging**: Analytics Module (`SQLite` buffer -> Batch Upload).
 
@@ -32,16 +32,14 @@
 
 ### UC3 – QR Code Activation
 
-- **Trigger**: QR scan via `expo-camera`.
-- **Bypass**: GPS sensing only (manual fallback path, not automatic location trigger).
-- **Execution**: Narration Engine (dispatch `MANUAL_TRIGGER`, still enforces single voice + interrupt rules).
-- **Constraint**: Fixed-location POI only.
+- **Trigger**: QR scan via `expo-camera` looking at the stall's menu.
+- **Execution**: Narration Engine (dispatch `PLAY_EVENT`, still enforces single voice + interrupt rules).
 
 ---
 
 ## Defense Notes (For Presentation)
 
-- **Technical Integrity**: All use cases map to specific Expo libraries (Location, Speech, SQLite).
+- **Technical Integrity**: All use cases map to specific Expo libraries (Maps, Speech, SQLite).
 - **Offline-first**: UC1 ensures all data is available locally, enabling UC2-UC5 to function without network.
 - **Traceability**: Every user action results in a measurable Architectural Event.
 

@@ -1,14 +1,14 @@
 # Product Requirements Document (PRD) v1.0
 
-# Chùa Linh Ứng – Mobile Visitor App
+# Phố Ẩm Thực - Location-Based Food Narration System
 
 ## Document Information
 
 | Field | Value |
 |-------|-------|
-| Product Name | Chùa Linh Ứng Visitor App |
+| Product Name | Phố Ẩm Thực |
 | Version | 1.0 (MVP) |
-| Document Date | March 15, 2026 |
+| Document Date | March 2026 |
 | Status | Draft for Development |
 | Owner | Business Analyst / Product Owner |
 | Target Audience | Development Team, QA, Stakeholders |
@@ -30,6 +30,7 @@
 | 11 | Business Rules | [09_business_rules.md](09_business_rules.md) |
 | 12–13 | Technical Constraints & Dependencies | [10_technical_constraints.md](10_technical_constraints.md) |
 | 14–15 | Risks & Open Questions | [11_risks_and_open_questions.md](11_risks_and_open_questions.md) |
+| **15** | **Admin Requirements** | **[15_admin_requirements.md](15_admin_requirements.md)** |
 | 16 | Success Criteria & Acceptance | [12_success_criteria.md](12_success_criteria.md) |
 | 17 | Future Enhancements | [13_future_enhancements.md](13_future_enhancements.md) |
 | 18 | Appendix | [14_appendix.md](14_appendix.md) |

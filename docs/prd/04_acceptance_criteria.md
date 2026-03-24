@@ -9,228 +9,153 @@
 ### AC-001: Thanh toán Online (US-001)
 
 ```gherkin
-GIVEN I open the app for the first time
-AND I have not authenticated yet
-WHEN I select "Thanh toán Online" and choose VNPay
-THEN the app opens a WebView with the VNPay payment page
-WHEN I complete payment successfully
-THEN the app receives a deep link "chualinhung://payment-result?status=success"
-AND I am redirected to the content sync screen
-AND my AuthToken is stored securely
+GIVEN tôi mở ứng dụng lần đầu
+AND tôi chưa xác thực
+WHEN tôi chọn "Thanh toán Online"
+THEN ứng dụng mở WebView với trang thanh toán 
+WHEN tôi hoàn tất thanh toán thành công
+THEN ứng dụng nhận deep link "phoamthuc://payment-result?status=success"
+AND tôi được chuyển đến màn hình đồng bộ nội dung
+AND AuthToken của tôi được lưu trữ an toàn
 ```
 
-### AC-002: Nhập Mã Vé (US-002)
+### AC-002: Nhập Mã Tham Gia (US-001)
 
 ```gherkin
-GIVEN I am on the authentication screen
-WHEN I tap "Nhập mã vé"
-AND I enter a valid 6-character claim code "ABC123"
-AND I tap "Xác nhận"
-THEN the app validates the code with the backend
-AND on success, I proceed to the content sync screen
-AND the claim code is marked as used (cannot be reused)
+GIVEN tôi đang ở màn hình xác thực
+WHEN tôi nhấn "Nhập mã tham gia"
+AND tôi nhập mã hợp lệ 6 ký tự "ABC123"
+AND tôi nhấn "Xác nhận"
+THEN ứng dụng xác thực mã với backend
+AND nếu thành công, tôi được chuyển đến màn hình đồng bộ nội dung
+AND mã vé được đánh dấu là đã sử dụng (không thể dùng lại)
 
-GIVEN I enter an invalid code "XXXXXX"
-WHEN I tap "Xác nhận"
-THEN I see the error "Mã vé không hợp lệ hoặc đã được sử dụng."
-AND I can try again
+GIVEN tôi nhập mã không hợp lệ "XXXXXX"
+WHEN tôi nhấn "Xác nhận"
+THEN tôi thấy lỗi "Mã không hợp lệ hoặc đã được sử dụng."
+AND tôi có thể thử lại
 ```
 
-### AC-003: Đồng bộ Dữ liệu Offline (US-003)
+### AC-003: Đồng bộ Dữ liệu Offline (US-002)
 
 ```gherkin
-GIVEN I have just authenticated successfully
-WHEN the app begins content sync
-THEN I see a loading screen with a progress bar
-WHEN sync is complete
-THEN all POI data (text, coordinates, polygons, narrations) is stored in SQLite
-AND I reach the main Map screen
-AND subsequent sessions do NOT require re-downloading if content version is unchanged
+GIVEN tôi vừa xác thực thành công
+WHEN ứng dụng bắt đầu đồng bộ nội dung
+THEN tôi thấy màn hình loading với thanh tiến trình
+WHEN đồng bộ hoàn tất
+THEN toàn bộ dữ liệu POI (văn bản, tọa độ, thuyết minh) được lưu trong SQLite
+AND tôi được chuyển đến màn hình Bản đồ chính
+AND các lần mở sau KHÔNG cần tải lại nếu phiên bản nội dung không thay đổi
 
-GIVEN I have no internet connection but have previously synced data
-WHEN I open the app with a valid token
-THEN I bypass the sync step and go directly to the Map screen
-AND I see a banner "Đang dùng nội dung cũ (ngày [last_sync_date])"
+GIVEN tôi không có kết nối internet nhưng đã từng đồng bộ trước đó
+WHEN tôi mở ứng dụng với token hợp lệ
+THEN tôi bỏ qua bước đồng bộ và vào thẳng màn hình Bản đồ
+AND tôi thấy banner "Đang dùng nội dung cũ (ngày [last_sync_date])"
 ```
 
-### AC-004: Tự động Phát Thuyết minh khi Vào POI (US-004)
+### AC-004: Phát Thuyết minh khi Nhấn POI trên Bản đồ (US-004)
 
 ```gherkin
-GIVEN I am on the Map screen with GPS tracking active
-AND I am outside all POI geofences
-WHEN I walk into the geofence of POI "Tượng Phật Bà"
-AND my GPS position is confirmed inside the polygon for 3 consecutive readings
-THEN the narration for "Tượng Phật Bà" starts playing automatically in my selected language
-AND I see a notification banner "Đang phát: Tượng Phật Bà"
-AND no manual action is required
+GIVEN tôi đang xem màn hình Bản đồ
+WHEN tôi nhấn vào một marker đại diện cho "Quán Phở Thìn"
+THEN hiển thị Bottom Sheet thông tin của quán
+WHEN tôi nhấn nút "Nghe thuyết minh" trên Bottom Sheet
+THEN thuyết minh cho "Quán Phở Thìn" bắt đầu phát bằng ngôn ngữ đã chọn
+AND Mini Player xuất hiện ở cuối màn hình
 ```
 
-### AC-005: Dừng Thuyết minh khi Rời POI (US-005)
+### AC-005: Dừng Thuyết minh Hiện Tại (Single Voice Rule) (US-005)
 
 ```gherkin
-GIVEN narration for "Tượng Phật Bà" is currently playing
-WHEN I walk outside the geofence boundary of "Tượng Phật Bà"
-THEN the narration stops IMMEDIATELY (no delay)
-AND I see a brief toast "Đã rời khỏi Tượng Phật Bà"
-AND the player bar disappears or shows idle state
+GIVEN thuyết minh "Quán Phở Thìn" đang phát
+WHEN tôi nhấn vào quán "Bánh Mì Huỳnh Hoa"
+AND tôi nhấn nút "Nghe thuyết minh"
+THEN thuyết minh "Quán Phở Thìn" dừng NGAY LẬP TỨC
+AND thuyết minh "Bánh Mì Huỳnh Hoa" bắt đầu phát
+AND không có sự chồng lấn âm thanh giữa hai quán
 ```
 
-### AC-006: Chuyển Tự động sang POI Mới (US-006)
+### AC-006: Hiển thị Vị trí Người dùng (US-006)
 
 ```gherkin
-GIVEN narration for POI_A is playing
-WHEN I walk quickly and enter the geofence of POI_B
-THEN narration for POI_A stops immediately
-AND narration for POI_B starts after debounce confirmation
-AND there is no overlap between the two narrations
+GIVEN tôi đang ở màn hình Bản đồ
+WHEN tôi cấp quyền truy cập vị trí cho ứng dụng
+THEN tôi thấy một chấm xanh trên bản đồ đại diện cho vị trí hiện tại của tôi
+AND chấm xanh di chuyển khi tôi đi bộ trên khu phố
+AND hệ thống KHÔNG tự động phát âm thanh khi di chuyển (chỉ phục vụ định hướng)
 ```
 
-### AC-007: Xử lý GPS Không ổn định (US-007)
+### AC-007: Quét QR Code tại Quán (US-007)
 
 ```gherkin
-GIVEN I am standing near the boundary of a POI geofence
-AND my GPS signal fluctuates between inside and outside
-WHEN rapid enter/exit events are detected within 3 seconds
-THEN the debounce mechanism prevents false narration starts
-AND the system waits for 3 stable consecutive readings before triggering
-
-GIVEN my GPS accuracy drops to > 20 meters
-WHEN a geofence event would normally trigger
-THEN the system logs the uncertainty
-AND does NOT trigger narration until accuracy improves
+GIVEN tôi đứng trước một quán ăn có mã QR của hệ thống
+WHEN tôi nhấn biểu tượng quét QR trong ứng dụng
+THEN camera mở ra
+WHEN tôi quét mã QR hợp lệ
+THEN ứng dụng tra cứu thông tin quán ăn trong SQLite
+AND nếu đang có thuyết minh khác phát, thuyết minh đó dừng lại
+AND thuyết minh của quán vừa quét bắt đầu phát
+AND màn hình hiển thị thông tin chi tiết của quán
 ```
 
-### AC-008: Quét QR Code (US-008)
+### AC-008: Chọn Ngôn ngữ (US-008)
 
 ```gherkin
-GIVEN I am on any screen with the QR button available
-WHEN I tap the QR scan button
-THEN the camera opens with a scan overlay
-WHEN I point the camera at a valid POI QR code
-THEN the app reads the QR, looks up the POI in SQLite
-AND narration for that POI starts playing in my selected language
-AND a POI info card appears with the POI name and image
+GIVEN tôi đang ở bất kỳ màn hình nào
+WHEN tôi nhấn biểu tượng ngôn ngữ ở góc trên bên phải
+THEN hiển thị modal chọn ngôn ngữ với 15+ lựa chọn
+WHEN tôi chọn "한국어 (Korean)"
+THEN toàn bộ UI chuyển sang tiếng Hàn
+AND giọng TTS chuyển sang ko-KR
+AND các thuyết minh tiếp theo phát bằng tiếng Hàn
 
-GIVEN I scan a QR code for an unknown POI
-THEN I see "Không tìm thấy thông tin điểm tham quan này."
+GIVEN thiết bị không có engine TTS tiếng Hàn
+WHEN tôi chọn tiếng Hàn
+THEN tôi thấy cảnh báo "Giọng đọc tiếng Hàn không khả dụng trên thiết bị. Sử dụng tiếng Anh."
+AND thuyết minh fallback sang en-US
 ```
 
-### AC-009: Chọn Ngôn ngữ (US-009)
+### AC-009: Giao diện Đổi theo Ngôn ngữ (US-009)
 
 ```gherkin
-GIVEN I am on any screen
-WHEN I tap the language icon in the top-right corner
-THEN a language selection modal appears with 11+ options
-WHEN I select "한국어 (Korean)"
-THEN the UI labels switch to Korean
-AND the TTS voice switches to ko-KR
-AND the next triggered narration plays in Korean
-
-GIVEN the device does not have a Korean TTS engine installed
-WHEN I select Korean
-THEN I see a warning "Giọng đọc tiếng Hàn không khả dụng. Sử dụng tiếng Anh."
-AND narration falls back to en-US
+GIVEN tôi đã chọn "Français" làm ngôn ngữ
+WHEN tôi xem màn hình danh sách Tour ẩm thực
+THEN toàn bộ label UI, nút bấm hiển thị bằng tiếng Pháp
+AND tên và mô tả quán ăn hiển thị theo nội dung tiếng Pháp (nếu có)
 ```
 
-### AC-010: Giao diện Đổi theo Ngôn ngữ (US-010)
+### AC-010: Play / Pause Thuyết minh (US-010)
 
 ```gherkin
-GIVEN I have selected "Français" as my language
-WHEN I view the Tour list screen
-THEN all UI labels, button texts, and screen titles are displayed in French
-AND POI names and descriptions reflect the French narration content
+GIVEN thuyết minh đang phát
+WHEN tôi nhấn nút Pause trên Mini Player
+THEN thuyết minh dừng tạm thời
+AND nút Pause chuyển thành Play
+
+WHEN tôi nhấn nút Play
+THEN thuyết minh tiếp tục (hoặc phát lại từ đầu nếu thiết bị không hỗ trợ resume)
+
+WHEN tôi nhấn nút Stop (hoặc tắt player)
+THEN thuyết minh dừng hoàn toàn
+AND Mini Player ẩn đi
 ```
 
-### AC-011: Play / Pause Thuyết minh (US-011)
+### AC-011: Xem Danh sách Tour (US-012)
 
 ```gherkin
-GIVEN narration is playing for a POI
-WHEN I tap the Pause button in the player bar
-THEN narration pauses immediately
-AND the Pause button changes to a Play button
-
-WHEN I tap the Play button
-THEN narration resumes (or restarts from beginning if resume is not supported)
-
-GIVEN narration is paused
-WHEN I walk outside the POI geofence
-THEN narration stops completely (exit overrides pause state)
-AND the session is marked as "exited early"
+GIVEN tôi đã đăng nhập và đồng bộ dữ liệu
+WHEN tôi chuyển sang tab "Khám phá"
+THEN tôi thấy danh sách các chủ đề/tuyến gợi ý (ví dụ: Ăn vặt xế chiều) với ảnh, tên và thời gian ước tính.
 ```
 
-### AC-012: Hiển thị POI Đang Phát (US-012)
+### AC-012: Xem Lộ trình Tour / Tuyến Ẩm Thực (US-013)
 
 ```gherkin
-GIVEN narration is playing for "Chánh Điện"
-WHEN I look at the bottom of the screen
-THEN I see a persistent player bar showing:
-  - POI name: "Chánh Điện"
-  - Current language
-  - Play/Pause and Skip buttons
-AND the Map marker for "Chánh Điện" is highlighted
-```
-
-### AC-013: Xem Danh sách Tour (US-013)
-
-```gherkin
-GIVEN I am logged in and content is synced
-WHEN I navigate to the "Tour" tab
-THEN I see a list of available tours with cover image, name, POI count, and estimated duration
-AND the list loads from SQLite (no network required)
-```
-
-### AC-014: Xem Lộ trình Tour trên Bản đồ (US-014)
-
-```gherkin
-GIVEN I am viewing a Tour named "Lộ trình Chính"
-WHEN I tap "Xem bản đồ"
-THEN I see a map with a polyline connecting all POIs in order
-AND each POI is marked with a numbered pin (1, 2, 3...)
-AND I can tap each pin to see the POI name and description
-```
-
-### AC-015: Thuyết minh Tự động khi Theo Tour (US-015)
-
-```gherkin
-GIVEN I have started Tour mode for "Lộ trình Chính"
-WHEN I walk into the geofence of POI #1 "Cổng Chính"
-THEN narration for "Cổng Chính" plays automatically
-WHEN I walk to POI #2 "Chánh Điện"
-THEN narration for "Chánh Điện" plays automatically
-AND narration for POIs NOT in this tour does NOT trigger
-```
-
-### AC-016: Xem Tiến độ Tour (US-016)
-
-```gherkin
-GIVEN I am in Tour mode and have visited 2 of 5 POIs
-WHEN I view the Tour progress panel
-THEN I see 2 POIs marked as "Đã ghé" (checked)
-AND 3 POIs marked as "Chưa ghé" (unchecked)
-AND the progress shows "2/5 điểm"
-```
-
-### AC-017: Xem tất cả POI trên Bản đồ (US-017)
-
-```gherkin
-GIVEN I am on the Map screen
-WHEN the map loads
-THEN I see all POIs displayed as colored markers
-AND MAIN POIs are shown in blue
-AND minor POIs (WC, parking, etc.) are shown in orange
-AND my current location is shown as a blue dot
-```
-
-### AC-018: Tap POI để Xem Chi tiết (US-018)
-
-```gherkin
-GIVEN I see a POI marker on the map
-WHEN I tap the marker for "Giếng Cổ"
-THEN a bottom sheet slides up showing:
-  - POI name: "Giếng Cổ"
-  - Thumbnail image
-  - Short description (2 lines)
-  - Button "Nghe thuyết minh"
-WHEN I tap "Nghe thuyết minh"
-THEN narration for "Giếng Cổ" plays in my selected language
+GIVEN tôi chọn một tuyến "Ăn vặt xế chiều"
+WHEN tôi nhấn xem chi tiết
+THEN tôi thấy danh sách các quán ăn thuộc tuyến này
+AND có nút "Xem trên Bản đồ"
+WHEN tôi nhấn "Xem trên Bản đồ"
+THEN bản đồ hiện ra chỉ với các marker của các điểm trong tuyến
+AND tôi tự chủ động nhấn vào từng quán để nghe khi đến nơi
 ```
