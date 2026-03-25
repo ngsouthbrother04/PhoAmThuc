@@ -161,10 +161,3 @@ Khác với phiên bản trước (tự động theo GPS), hệ thống này:
 
   * Claim code (offline)
   * Hoặc free access (tuỳ scope MVP)
-
----
-
-Nếu bạn muốn, tôi có thể tiếp tục:
-
-* Rewrite lại **PRD + Use Cases + Acceptance Criteria** theo logic mới (user-trigger thay vì GPS-trigger)
-* Hoặc **refactor SPEC_CANONICAL.md** để bỏ hoàn toàn geofence-first → chuyển sang **user-interaction-first system** (cái này là critical)
