@@ -14,20 +14,128 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum PoiType {
+  FOOD
+  DRINK
+  SNACK
+  WC
+}
+
+enum AnalyticsAction {
+  PLAY
+  PAUSE
+  STOP
+  QR_SCAN
+}
+
+enum PaymentProvider {
+  VNPAY
+  MOMO
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
 model PointOfInterest {
-  id              String   @id @default(uuid())
-  name            Json     // { "vi": "...", "en": "..." }
-  description     Json     // { "vi": "...", "en": "..." }
-  
-  // PostGIS geometry format (stored as raw Polygon)
-  // Prisma doesn't natively support PostGIS types nicely yet, so we use Unsupported type
-  // or handle via raw SQL. For now, we will treat it as Unsupported to generate the table properly.
-  geom            Unsupported("geometry(Polygon, 4326)")
+  id              String           @id @default(uuid())
+  name            Json // { "vi": "...", "en": "..." }
+  description     Json // { "vi": "...", "en": "..." }
+  audioUrls       Json             @map("audio_urls") // { "vi": "https://...", "en": "https://..." }
+  latitude        Decimal          @db.Decimal(9, 6)
+  longitude       Decimal          @db.Decimal(9, 6)
+  type            PoiType
+  image           String?
+  contentVersion  Int              @default(1) @map("content_version")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  analyticsEvents AnalyticsEvent[]
 
-  triggerMetadata Json?    // { "debounceSeconds": 5, "priority": 1 }
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
+  @@index([type], map: "idx_points_of_interest_type")
+  @@index([contentVersion], map: "idx_points_of_interest_content_version")
   @@map("points_of_interest")
+}
+
+model Tour {
+  id             String   @id @default(uuid())
+  name           Json
+  description    Json
+  duration       Int      @default(0) @map("estimated_time")
+  poiIds         Json     @map("poi_ids")
+  image          String?
+  contentVersion Int      @default(1) @map("content_version")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([contentVersion], map: "idx_tours_content_version")
+  @@map("tours")
+}
+
+model AnalyticsEvent {
+  id         BigInt           @id @default(autoincrement())
+  deviceId   String           @map("device_id")
+  sessionId  String           @map("session_id")
+  poiId      String?          @map("poi_id")
+  action     AnalyticsAction
+  durationMs Int?             @map("duration_ms")
+  language   String?
+  timestamp  BigInt
+  uploaded   Boolean          @default(false)
+  createdAt  DateTime         @default(now()) @map("created_at")
+  poi        PointOfInterest? @relation(fields: [poiId], references: [id], onDelete: SetNull)
+
+  @@index([uploaded], map: "idx_analytics_events_uploaded")
+  @@index([timestamp], map: "idx_analytics_events_timestamp")
+  @@index([deviceId, sessionId], map: "idx_analytics_events_device_session")
+  @@index([poiId], map: "idx_analytics_events_poi_id")
+  @@map("analytics_events")
+}
+
+model ClaimCode {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  isUsed    Boolean  @default(false) @map("is_used")
+  usedAt    DateTime? @map("used_at")
+  usedBy    String?  @map("used_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isUsed], map: "idx_claim_codes_is_used")
+  @@map("claim_codes")
+}
+
+model PaymentTransaction {
+  id            String          @id @default(uuid())
+  transactionId String          @unique @map("transaction_id")
+  provider      PaymentProvider
+  amount        Int
+  currency      String          @default("VND")
+  status        PaymentStatus   @default(PENDING)
+  returnUrl     String?         @map("return_url")
+  paymentUrl    String          @map("payment_url")
+  expiresAt     DateTime        @map("expires_at")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  callbackEvents PaymentCallbackEvent[]
+
+  @@index([status], map: "idx_payment_transactions_status")
+  @@index([createdAt], map: "idx_payment_transactions_created_at")
+  @@map("payment_transactions")
+}
+
+model PaymentCallbackEvent {
+  id            String             @id @default(uuid())
+  idempotencyKey String            @unique @map("idempotency_key")
+  transactionId String             @map("transaction_id")
+  signatureHash String             @map("signature_hash")
+  status        PaymentStatus
+  createdAt     DateTime           @default(now()) @map("created_at")
+  payment       PaymentTransaction @relation(fields: [transactionId], references: [transactionId], onDelete: Cascade)
+
+  @@index([transactionId], map: "idx_payment_callback_events_transaction_id")
+  @@map("payment_callback_events")
 }

@@ -7,25 +7,40 @@
     "dev": "nodemon src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prisma:format": "prisma format --schema prisma/schema.prisma",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+    "prisma:migrate:dev": "prisma migrate dev --schema prisma/schema.prisma",
+    "prisma:migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
+    "prisma:seed": "ts-node --transpile-only -r dotenv/config prisma/seed.ts",
+    "db:setup": "npm run prisma:migrate:deploy && npm run prisma:generate && npm run prisma:seed"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/express": "^5.0.6",
+    "bullmq": "^5.71.0",
+    "compression": "^1.8.1",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "google-tts-api": "^2.0.2",
     "helmet": "^8.1.0",
+    "ioredis": "^5.10.1",
     "nodemon": "^3.1.11"
   },
   "devDependencies": {
     "@prisma/client": "^6.19.0",
+    "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.19",
-    "@types/node": "^25.1.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.0",
+    "@types/supertest": "^7.2.0",
     "prisma": "^6.19.0",
+    "supertest": "^7.2.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.1"
   }
 }
