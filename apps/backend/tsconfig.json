@@ -8,8 +8,12 @@
     "esModuleInterop": true,
     "moduleResolution": "node"
   },
+  "include": [
+    "src/**/*.ts"
+  ],
   "exclude": [
     "node_modules",
+    "prisma/**/*.ts",
     "prisma.config.ts",
     "dist"
   ]
