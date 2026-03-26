@@ -18,6 +18,9 @@ Status: active
 Version: 1.1
 Last updated: 2026-03-25
 
+Progress update (2026-03-26):
+- DONE: ISSUE-001, ISSUE-002, ISSUE-003, ISSUE-003B
+
 Terminology note:
 - `AL_GUIDELINES.md` in requests is interpreted as `AI_GUIDELINES.md` in this repository.
 
@@ -52,14 +55,14 @@ Execution mapping:
 ## 3. Detailed Task Breakdown
 
 ### Workstream A: Backend API and Data
-A1. Boot Backend (Express, Node 20+, Postgres, S3/Local Storage)  
+A1. Boot Backend (Express, Node 20+, Postgres, Local Storage)  
 Linked issue: ISSUE-001
 
 A2. Auth/Payment Endpoints (claim + payment initiate + callback/finalize with validation and error contract)  
 Linked issue: ISSUE-002  
 Acceptance mapping: UC1, TC-1.1 ~ TC-1.5
 
-A3. TTS Generation Integration (server-side queue only; Google Cloud/Azure/Festival; MP3 to S3/Local FS)  
+A3. TTS Generation Integration (server-side queue only; Piper offline; MP3 to Local FS)  
 Linked issue: ISSUE-003  
 Acceptance mapping: ARCHITECTURE.md §3.3, AI_GUIDELINES.md §7
 

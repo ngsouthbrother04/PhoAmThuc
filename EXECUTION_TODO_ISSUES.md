@@ -29,25 +29,35 @@ All core logic must comply with SPEC_CANONICAL.md (explicit Tap/QR trigger only,
 ## Sprint S1 (P0 Foundation)
 
 ### ISSUE-001 - Backend bootstrap hardening
-Status: TODO
+Status: DONE
 Priority: P0
 Scope: Update backend app bootstrap and config loading.
 Target files: apps/backend/src/index.ts
 
 ### ISSUE-002 - Auth API skeleton and validation
-Status: TODO
+Status: DONE
 Priority: P0
 Scope: Add/align auth API contracts for claim + payment initiate + payment callback/finalize with validation and error contract.
 Acceptance mapping: UC1, TC-1.1 ~ TC-1.5
 
-### ISSUE-003 - Backend TTS Processing (Google Cloud)
-Status: TODO
+### ISSUE-003 - Backend TTS Processing (Piper Offline)
+Status: DONE
 Priority: P0
-Scope: Implement server-side TTS job queue (no on-device TTS), save MP3 to S3/Local FS, and persist `audio_urls` in PostgreSQL.
+Scope: Implement server-side TTS job queue (no on-device TTS), save MP3 to local filesystem, and persist `audio_urls` in PostgreSQL.
 Acceptance mapping: ARCHITECTURE.md §3.3, AI_GUIDELINES.md §7
 
+Progress note (2026-03-26):
+1. Added admin trigger endpoint for POI audio generation queue.
+2. Added queue mode: BullMQ with Redis and in-memory fallback when Redis is not configured.
+3. Added local MP3 persistence and DB `audio_urls` update per language.
+4. Added local filesystem storage as canonical provider for audio outputs.
+5. Added integration test for enqueue flow that validates `audio_urls` update in real Prisma DB path.
+6. Added integration test for local path contract persisted in `audio_urls`.
+7. Added runtime config validation API + startup check + CLI predeploy check (`npm run tts:validate`).
+8. Added explicit BullMQ duplicate guard (`queue.getJob(jobId)`) before enqueue to reduce duplicate generation risk.
+
 ### ISSUE-003B - Sync manifest and full content endpoints
-Status: TODO
+Status: DONE
 Priority: P0
 Scope: Implement `GET /api/v1/sync/manifest` and `GET /api/v1/sync/full` with version/hash check, `needsSync` short-circuit, and payload including POIs/tours/audio URLs.
 Acceptance mapping: UC8, TC-8.x, TC-12.x
@@ -122,7 +132,6 @@ Acceptance mapping: docs/test_scenarios.md (Functional + Integration + Performan
 ## Current blockers snapshot
 1. Mobile dependencies required by canonical spec are not installed yet.
 2. Mobile SQLite/file-cache/sync service scaffolding is not implemented yet (blocks UC8 offline-first validation).
-3. TTS cloud credentials and storage target (S3 vs Local FS) are not finalized for ISSUE-003 execution.
 
 ## Rules for execution
 1. Any behavior/default change must update SPEC_CANONICAL.md first.
