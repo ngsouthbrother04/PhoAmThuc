@@ -18,21 +18,7 @@ Mục đích: AI chỉ cần đọc file này là biết toàn bộ tài liệu 
 ## 2) Khối tài liệu PRD
 
 1. /docs/prd/index.md
-2. /docs/prd/01_executive_summary.md
-3. /docs/prd/02_personas_and_user_stories.md
-4. /docs/prd/03_functional_requirements.md
-5. /docs/prd/04_acceptance_criteria.md
-6. /docs/prd/05_non_functional_requirements.md
-7. /docs/prd/06_data_requirements.md
-8. /docs/prd/07_api_design.md
-9. /docs/prd/08_ui_ux.md
-10. /docs/prd/09_business_rules.md
-11. /docs/prd/10_technical_constraints.md
-12. /docs/prd/11_risks_and_open_questions.md
-13. /docs/prd/12_success_criteria.md
-14. /docs/prd/13_future_enhancements.md
-15. /docs/prd/14_appendix.md
-16. /docs/prd/15_admin_requirements.md
+2. Đọc toàn bộ section PRD theo đúng thứ tự được quy định trong /docs/prd/index.md.
 
 ## 3) Khối tài liệu vận hành và triển khai
 
