@@ -77,7 +77,7 @@ User-controlled food exploration is the priority. Narration plays ONLY when the 
 **Process**:
 1. Admin creates/edits POI via CMS
 2. Backend triggers background job queue
-3. Cloud TTS API generates MP3 (15 languages)
+3. Piper generates MP3 offline on backend (15 languages)
 4. Audio URLs saved to PostgreSQL `audio_urls` JSONB
 5. Mobile sync caches MP3 files locally
 6. App plays from cache only
@@ -119,7 +119,7 @@ User-controlled food exploration is the priority. Narration plays ONLY when the 
 **Queue Contract**:
 - Use one logical queue for TTS jobs (BullMQ/Redis).
 - Job idempotency key: `{poiId}:{language}:{contentVersion}`.
-- Concurrency is configurable and provider-aware (start with 5 workers).
+- Concurrency is configurable (start with 5 workers).
 - Retries use exponential backoff (e.g., 3 attempts, 2s/8s/30s).
 - Failed jobs move to DLQ/failed set for admin retry.
 
@@ -181,8 +181,8 @@ User-controlled food exploration is the priority. Narration plays ONLY when the 
 | Framework | Express.js | HTTP routing | REST API only |
 | Primary DB | PostgreSQL 14+ | Source of truth | With PostGIS extension |
 | Cache | Redis | Query caching | Sync manifest versioning |
-| TTS Engine | Google Cloud TTS / Azure / Festival | Audio generation | Background job queue |
-| Storage | AWS S3 or Local FS | Audio & media files | CDN-backed recommended |
+| TTS Engine | Piper (offline, free, no account) | Audio generation | Background job queue |
+| Storage | Audio local filesystem + Image Cloudinary | Audio & media files | `/audio/...` for MP3, Cloudinary URL for images |
 | ORM | Prisma | Database access | Auto-generated TypeScript |
 | Jobs | BullMQ / Node-Schedule | Background TTS processing | No Kafka/RabbitMQ |
 
@@ -359,8 +359,8 @@ Mobile GET /api/v1/sync/manifest
 
 ### 10.4 Backend TTS Generation
 - **Admin CMS**: Create POI with text in all 15 languages
-- **Backend Job**: Generate MP3 per language via Cloud TTS
-- **Storage**: `s3://bucket/pois/{poiId}_{language}.mp3`
+- **Backend Job**: Generate MP3 per language via Piper offline TTS
+- **Storage**: `/audio/pois/{poiId}_{language}.mp3`
 - **Database**: Update `audio_urls` JSONB with all 15 URLs
 
 **Reference**: AI_GUIDELINES.md §7, backend_design.md §4 (i18n Architecture), account for database_design.md §2.2 (JSONB multi-language)
@@ -393,7 +393,7 @@ All codegen for Admin features must follow these invariants:
 ### 12.1 Non-Negotiable Admin Invariants
 #### 12.1.1 Server-Side TTS Generation Only
 - **Admin action**: Create/Edit POI → Trigger background job
-- **Backend flow**: Call Google Cloud TTS (or equivalent) to generate MP3 for **15 languages**
+- **Backend flow**: Call Piper offline TTS engine to generate MP3 for **15 languages**
 - **Mobile**: **Never** generates TTS (expo-av playback only, pre-generated files)
 - **Audio storage**: Save `audioUrls` JSONB per language in `points_of_interest`
 - **Regeneration**: Provide "Regenerate Audio" button per POI (regenerate only changed languages)
@@ -409,7 +409,7 @@ All codegen for Admin features must follow these invariants:
 **Reference**: backend_design.md §2.1 (API Endpoints — POST /api/v1/pois/{id}/publish)
 
 #### 12.1.3 Media Handling
-- **Images**: Upload → AWS S3 / CDN (per docs/prd/10_technical_constraints.md)
+- **Images**: Upload to Cloudinary and store Cloudinary URL in DB (per docs/prd/10_technical_constraints.md)
 - **Audio**: Pre-generated MP3, stored as URLs in `audioUrls` JSONB
 - **Versioning**: Increment `content_version` on any publish
 - **Testing**: Validate audio URLs resolve before allowing publish

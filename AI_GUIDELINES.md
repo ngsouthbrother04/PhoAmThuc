@@ -130,8 +130,8 @@ AI MUST NOT:
 
 **TTS Generation** (Server-side only):
 - Admin creates/edits POI text → Backend triggers background job
-- For each language: Call Google Cloud TTS / Azure TTS / Festival
-- Generate MP3 file, upload to S3/Local FS
+- For each language: Call Piper offline TTS engine
+- Generate MP3 file, save to local filesystem
 - Save URL to `audioUrls` JSONB field
 - Mobile syncs, downloads, caches MP3 files
 
@@ -218,8 +218,8 @@ When generating code, assume:
 - **Protocol**: REST API with versioning (`/api/v1/...`)
 - **TTS Generation**: 
   - Backend background job (BullMQ / Node-schedule)
-  - Calls Cloud TTS API (Google Cloud TTS preferred, Azure acceptable, Festival open-source option)
-  - Saves MP3 files to S3 / Local FS
+  - Calls Piper offline TTS engine (self-hosted, free, no account)
+  - Saves MP3 files to local filesystem
   - Updates PostgreSQL `audioUrls` JSONB field
 - **ORM**: Prisma (TypeScript-first, auto-generated types)
 
@@ -231,7 +231,7 @@ When generating code, assume:
 | **PostGIS** | Extension | Geo-spatial queries (radius search) |
 | **Cache** | Redis | Query caching, sync manifest cache |
 | **Offline DB** | SQLite | Mobile mirror (pois, tours, metadata) |
-| **File Storage** | S3 or Local FS | MP3 audio files, images |
+| **File Storage** | Local filesystem (audio) + Cloudinary (images) | MP3 audio files, images |
 
 ### 10.4 Payment Processing
 - **Gateways**: VNPay (primary), Momo (alternative)

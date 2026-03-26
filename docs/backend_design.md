@@ -35,7 +35,7 @@
         ┌─────────────┼─────────────┐          │
         ▼             ▼             ▼          ▼
     ┌────────┐  ┌────────┐  ┌──────────┐ ┌────────┐
-    │Postgres│  │ Redis  │  │Cloud TTS │ │ S3    │
+    │Postgres│  │ Redis  │  │ Piper   │ │ Local │
     │ (Main) │  │(Cache) │  │API/Local │ │/Local │
     └────────┘  └────────┘  └──────────┘ └────────┘
         ▲                                     ▲
@@ -53,8 +53,8 @@
 - **Backend API**: Node.js 20+ + Express + TypeScript
 - **Database chính**: PostgreSQL (with PostGIS extension)
 - **Cache**: Redis
-- **Storage**: AWS S3 hoặc Local Filesystem
-- **Text-to-Speech**: Google Cloud TTS / Azure Cognitive Services / Self-hosted open-source
+- **Storage**: Audio local filesystem + Image Cloudinary
+- **Text-to-Speech**: Piper (offline, free, no account)
 - **Database Offline**: SQLite (trên Mobile)
 
 ---
@@ -127,7 +127,7 @@ Language selection (canonical): query param `?language=vi`
     "dataChecksum": "abc123def456",
     "lastUpdated": "2026-03-24T15:30:00Z",
     "requiresFullSync": false,
-    "mediaS3Prefix": "https://s3.amazonaws.com/phoamthuc-media/"
+    "mediaBasePath": "/audio/"
   }
 }
 
@@ -176,11 +176,11 @@ Language selection (canonical): query param `?language=vi`
       "longitude": 105.8545,
       "distance": 45.5,
       "type": "FOOD",
-      "image": "https://s3.../pho-thin.jpg",
+      "image": "https://res.cloudinary.com/pho-am-thuc/image/upload/v1/pois/pho-thin.jpg",
       "audioUrls": {
-        "vi": "https://s3.../poi_001_vi.mp3",
-        "en": "https://s3.../poi_001_en.mp3",
-        "ko": "https://s3.../poi_001_ko.mp3"
+        "vi": "/audio/poi_001_vi.mp3",
+        "en": "/audio/poi_001_en.mp3",
+        "ko": "/audio/poi_001_ko.mp3"
       }
     }
   ]
@@ -209,7 +209,7 @@ Language selection (canonical): query param `?language=vi`
     "estimatedDurationMins": 120,
     "poiCount": 8,
     "poiIds": ["poi_001", "poi_003", "poi_005", ...],
-    "image": "https://s3.../tour-001.jpg"
+    "image": "https://res.cloudinary.com/pho-am-thuc/image/upload/v1/tours/tour-001.jpg"
   }
 }
 ```
@@ -315,7 +315,7 @@ Language selection (canonical): query param `?language=vi`
 **Yêu cầu**: 
 - Hỗ trợ 15 ngôn ngữ
 - Backend: Server-side TTS generation (không trên mobile)
-- Storage: MP3 files lưu trên S3/Local
+- Storage: MP3 files lưu trên local filesystem
 
 **Flow**:
 ```
@@ -326,9 +326,9 @@ Backend receives content update
 Trigger Background Job (BullMQ / Node-schedule)
   ↓
 For each language:
-  - Call Google Cloud TTS / Azure / Festival (open-source)
+  - Call Piper offline TTS engine
   - Generate MP3 file
-  - Upload to S3 / Local filesystem
+  - Save to local filesystem (`/audio/...`)
   ↓
 Database: Save audio URLs to audioUrls JSON field
   ↓
@@ -343,20 +343,16 @@ Mobile plays from local cache (offline-first)
 
 | Công nghệ | Miễn phí | Chất lượng | Dễ sử dụng | Ghi chú |
 |-----------|---------|---------|-----------|---------|
-| **Google Cloud TTS** | USD 16/1M chars | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | Free tier 4M chars/month |
-| **Azure Cognitive Services** | Free tier 0.5M/year | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | Nếu có Azure subscription |
-| **Elevenlabs** | Limited free | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | High quality, mất phí |
-| **Festival** (Open-source) | Hoàn toàn miễn phí | ⭐⭐⭐ | ⭐⭐ | Limited voice, cần self-host |
-| **MaryTTS** (Open-source) | Hoàn toàn miễn phí | ⭐⭐⭐⭐ | ⭐⭐⭐ | Tốt, cần self-host |
+| **Piper** (Open-source) | Hoàn toàn miễn phí | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | Offline, self-host, không cần account |
 
-**Đề xuất cho đồ án**: Google Cloud TTS (Free tier đủ cho phase 1 - 10-50 POI) hoặc Festival (hoàn toàn miễn phí, tự lưu trữ).
+**Đề xuất cho đồ án**: Piper (offline, free, no account) cho toàn bộ môi trường dev/prod.
 
 ### 3.3 Queue Contract cho Scale Nhiều User/POI
 
 Để tránh nghẽn khi nhiều nội dung cập nhật cùng lúc:
 
 - **Idempotency key**: `{poiId}:{language}:{contentVersion}` (tránh generate trùng).
-- **Concurrency mặc định**: 5 workers (điều chỉnh qua env theo quota provider).
+- **Concurrency mặc định**: 5 workers (điều chỉnh qua CPU/RAM máy chủ).
 - **Retry policy**: exponential backoff (2s, 8s, 30s), tối đa 3 lần.
 - **Failed jobs**: lưu vào failed set/DLQ để admin có thể retry thủ công.
 - **Observability**: có endpoint/admin panel hiển thị `queued`, `processing`, `failed`, `completed`.
@@ -388,9 +384,9 @@ Tất cả text content (name, description) được lưu dạng JSON:
     ...
   },
   "audioUrls": {
-    "vi": "https://s3.../poi_001_vi.mp3",
-    "en": "https://s3.../poi_001_en.mp3",
-    "ko": "https://s3.../poi_001_ko.mp3",
+    "vi": "/audio/poi_001_vi.mp3",
+    "en": "/audio/poi_001_en.mp3",
+    "ko": "/audio/poi_001_ko.mp3",
     ...
   }
 }
@@ -517,7 +513,7 @@ TTL: 24 hours (content), 1 hour (dynamic data)
 | **Hosting** | Heroku / Railway.app / Azure App Service | Simple deploy, auto-scaling |
 | **Database** | PostgreSQL (AWS RDS / Azure Database) | Managed, backup, PostGIS support |
 | **Cache** | Redis Cloud / Azure Cache for Redis | Managed redis |
-| **File Storage** | AWS S3 / Azure Blob Storage | Reliable, CDN integration |
+| **File Storage** | Audio local filesystem + Image Cloudinary | Cost-effective, easy CDN delivery for images |
 | **TTS Compute** | In-process worker (default) or optional serverless worker | Keep one monolith codebase; scale background jobs without splitting into microservices |
 | **Monitoring** | Datadog / New Relic | Real-time performance tracking |
 

@@ -33,8 +33,8 @@
 ## 4. Integration Dependencies
 
 1. Payment providers: VNPay and Momo.
-2. TTS providers: Google Cloud TTS preferred; Azure/Festival acceptable alternatives.
-3. Storage: S3 or local filesystem with CDN-capable pathing.
+2. TTS provider: Piper (offline, free, no account).
+3. Storage: audio on local filesystem; images on Cloudinary.
 
 ## 5. Known Limitations
 

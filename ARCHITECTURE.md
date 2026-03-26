@@ -61,7 +61,8 @@ graph TD
 - **Runtime**: `Node.js 20+`
 - **Database**:
   - `PostgreSQL` + `PostGIS`: Stores POIs, Users, Telemetry, and Geospatial Data.
-  - **Storage**: AWS S3 or Local File System for storing generated `.mp3` audio files.
+  - **Audio Storage**: Local File System for generated `.mp3` audio files.
+  - **Image Storage**: Cloudinary for POI/tour images.
 - **Background Jobs**: Dedicated worker process/queue for TTS generation.
 
 ---
@@ -105,19 +106,19 @@ When multiple POIs fall into the same nearby radius (e.g., 500m), the map engine
 
 ### 3.3 Backend TTS Processing
 
-Admin creates/updates POI content → Backend triggers background job → Cloud TTS generates MP3 → Files saved to S3/Local → URLs saved to PostgreSQL.
+Admin creates/updates POI content → Backend triggers background job → Piper generates MP3 offline → Files saved to local storage → URLs saved to PostgreSQL.
 
 **Flow Details**:
 1. Admin via CMS: Create/Edit POI with text in 15 languages
 2. Backend receives request, validates, starts background job (BullMQ/Node-schedule)
 3. For each language:
-   - Call Google Cloud TTS API (or Azure TTS / Festival open-source)
+  - Call Piper offline TTS engine
    - Receive generated MP3 stream
-   - Save to S3 `/pois/${poiId}_${language}.mp3` (or local FS)
+  - Save to local path `/audio/pois/${poiId}_${language}.mp3`
 4. Update PostgreSQL:
    ```sql
    UPDATE points_of_interest 
-   SET audio_urls = '{"vi": "s3://...vi.mp3", "en": "...en.mp3", ...}',
+  SET audio_urls = '{"vi": "/audio/...vi.mp3", "en": "/audio/...en.mp3", ...}',
        content_version = content_version + 1
    WHERE id = '${poiId}';
    ```
@@ -127,9 +128,9 @@ Admin creates/updates POI content → Backend triggers background job → Cloud 
 8. On POI tap → Load text & audio from local SQLite + file cache
 
 **Technology Stack** (Backend TTS):
-- **Audio Generation**: Google Cloud TTS (preferred), Azure Cognitive Services, Festival (open-source)
+- **Audio Generation**: Piper (offline, free, no account)
 - **Job Queue**: Bull (Redis-backed) or Node-schedule (simpler, for < 100 POIs)
-- **Storage**: AWS S3 or Local Filesystem (`/app/public/audio/`)
+- **Storage**: Local Filesystem (`/app/public/audio/`)
 - **ORM**: Prisma for PostgreSQL updates
 
 #### 3.3.1 Queue Scalability Contract
@@ -187,8 +188,8 @@ interface PointOfInterest {
   
   // Audio URLs (JSONB) - pre-generated, server-side
   audioUrls: {
-    vi: "https://s3.../poi_001_vi.mp3";
-    en: "https://s3.../poi_001_en.mp3";
+    vi: "/audio/poi_001_vi.mp3";
+    en: "/audio/poi_001_en.mp3";
     // ... per language
   };
   
@@ -198,7 +199,7 @@ interface PointOfInterest {
   
   // Metadata
   type: "FOOD" | "DRINK" | "SNACK" | "WC";
-  image: string;               // Main POI image URL (S3)
+  image: string;               // Main POI image URL (Cloudinary)
   
   // Versioning for sync
   contentVersion: 1;           // Increments on update
@@ -294,7 +295,7 @@ CREATE TABLE sync_metadata (
       "vi": "Phở bò nổi tiếng...", "en": "Famous beef pho...", ...
     },
     "audioUrls": {
-      "vi": "s3://.../vi.mp3", "en": "s3://.../en.mp3", ...
+      "vi": "/audio/.../vi.mp3", "en": "/audio/.../en.mp3", ...
     }
   }
   ```
@@ -567,7 +568,7 @@ const useAudioStore = create((set, get) => ({
 2. **Multi-language**: Return single language per request (`?language=vi`)
 3. **Sync**: Compare manifest version, return only changed data
 4. **Error Handling**: Use consistent ApiError class
-5. **Testing**: Mock S3, database, TTS API calls
+5. **Testing**: Mock local file storage, database, Piper TTS calls
 6. **Documentation**: Swagger/OpenAPI for all endpoints
 
 **Example Backend Service: POI Create**
@@ -615,10 +616,10 @@ const ttsGenerator = async (job) => {
   const audioUrls = {};
   
   for (const [lang, text] of Object.entries(texts)) {
-    const mp3Buffer = await googleTTS.synthesize(text, lang);
-    const s3Key = `pois/${poiId}_${lang}.mp3`;
-    await s3Client.upload(s3Key, mp3Buffer);
-    audioUrls[lang] = `https://s3.../.../${s3Key}`;
+    const mp3Buffer = await piper.synthesize(text, lang);
+    const fileName = `${poiId}_${lang}.mp3`;
+    await localStorage.save(`/audio/pois/${fileName}`, mp3Buffer);
+    audioUrls[lang] = `/audio/pois/${fileName}`;
   }
   
   // Update database with audio URLs
@@ -650,7 +651,7 @@ const ttsGenerator = async (job) => {
 | **API Host** | Heroku / Railway.app / Azure App Service |
 | **Database** | AWS RDS PostgreSQL / Azure Database for PostgreSQL |
 | **Cache** | Redis Cloud / Azure Cache for Redis |
-| **Storage** | AWS S3 / Azure Blob Storage |
+| **Storage** | Audio local filesystem (`/app/public/audio`) + Image Cloudinary |
 | **TTS Compute** | In-process worker (default) or optional serverless worker in same codebase |
 | **Monitoring** | Datadog / New Relic / Azure Monitor |
 | **CI/CD** | GitHub Actions |
@@ -662,9 +663,12 @@ Monolith clarification: serverless worker ở đây chỉ là cách chạy nền
 ```
 DATABASE_URL=postgresql://user:pass@host:5432/pho_am_thuc
 REDIS_URL=redis://host:6379
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
-GOOGLE_TTS_API_KEY=...
+TTS_STORAGE_PROVIDER=local
+TTS_LOCAL_AUDIO_DIR=./public/audio
+TTS_ENGINE=piper
+CLOUDINARY_CLOUD_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
 VNPAY_MERCHANT_ID=...
 MOMO_MERCHANT_ID=...
 JWT_SECRET=...

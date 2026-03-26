@@ -15,7 +15,7 @@
 | **Primary DB** | PostgreSQL | Source of Truth | Server-side |
 | **Cache Layer** | Redis | Query optimization | Temporary data |
 | **Offline Client** | SQLite | Offline-first sync | Mobile device |
-| **File Storage** | S3 / Local FS | Media (images, MP3) | CDN-backed |
+| **File Storage** | Audio Local FS + Image Cloudinary | Media (images, MP3) | `/audio/...` for MP3, Cloudinary URL for images |
 
 ```
 ┌─────────────────────────────────────┐
@@ -75,7 +75,7 @@ CREATE TABLE points_of_interest (
   
   -- Audio URLs per language
   audio_urls JSONB NOT NULL DEFAULT '{}',  
-  -- { "vi": "https://s3.../poi_001_vi.mp3", "en": "...", ... }
+  -- { "vi": "/audio/poi_001_vi.mp3", "en": "...", ... }
   
   -- Location data
   latitude DECIMAL(9, 6) NOT NULL,  -- e.g., 21.028537
@@ -83,7 +83,7 @@ CREATE TABLE points_of_interest (
   
   -- POI metadata
   type PoiType NOT NULL DEFAULT 'FOOD',  -- FOOD, DRINK, SNACK, WC
-  image VARCHAR(2048),  -- URL to main image (S3/CDN)
+  image VARCHAR(2048),  -- URL to main image (Cloudinary)
   
   -- Content versioning (for sync)
   content_version INT NOT NULL DEFAULT 1,
@@ -136,15 +136,15 @@ CREATE EXTENSION IF NOT EXISTS postgis;
     ...
   },
   "audio_urls": {
-    "vi": "https://s3.amazonaws.com/pho-am-thuc-media/pois/poi_001_vi.mp3",
-    "en": "https://s3.amazonaws.com/pho-am-thuc-media/pois/poi_001_en.mp3",
-    "ko": "https://s3.amazonaws.com/pho-am-thuc-media/pois/poi_001_ko.mp3",
+    "vi": "/audio/pois/poi_001_vi.mp3",
+    "en": "/audio/pois/poi_001_en.mp3",
+    "ko": "/audio/pois/poi_001_ko.mp3",
     ...
   },
   "latitude": 21.028537,
   "longitude": 105.854214,
   "type": "FOOD",
-  "image": "https://s3.amazonaws.com/pho-am-thuc-media/images/pho_thin.jpg",
+  "image": "https://res.cloudinary.com/pho-am-thuc/image/upload/v1/pois/pho_thin.jpg",
   "content_version": 2,
   "created_at": "2026-03-20T10:00:00Z",
   "updated_at": "2026-03-24T15:30:00Z"
@@ -198,7 +198,7 @@ CREATE INDEX idx_tours_content_version ON tours(content_version);
   },
   "poi_ids": ["poi_001", "poi_003", "poi_005", "poi_008"],
   "estimated_time": 120,
-  "image": "https://s3.../tour-student-food.jpg",
+  "image": "https://res.cloudinary.com/pho-am-thuc/image/upload/v1/tours/tour-student-food.jpg",
   "content_version": 1,
   "created_at": "2026-03-15T10:00:00Z",
   "updated_at": "2026-03-15T10:00:00Z"
@@ -644,7 +644,7 @@ const updatePOI = async (poiId: string, updates: {
 ### 6.1 File Naming Convention
 
 ```
-S3 Bucket: pho-am-thuc-media/
+Audio local root: /public/audio/
 
 Structure:
 /pois/
@@ -652,14 +652,14 @@ Structure:
   /poi_001_en.mp3
   /poi_001_ko.mp3
   ...
-/images/
-  /pho_thin.jpg
-  /tour_001.jpg
-  ...
 /tours/
   /tour_001_vi.mp3
   /tour_001_en.mp3
   ...
+
+Cloudinary image folders:
+- pois/*
+- tours/*
 ```
 
 ### 6.2 Audio Generation Trigger (Admin)
@@ -680,9 +680,9 @@ const publishPOI = async (poiId: string) => {
       text: poi.description[lang]
     });
     
-    // After job completes, S3 URL is saved
-    const s3Url = `https://s3.../pois/${poiId}_${lang}.mp3`;
-    audioUrls[lang] = s3Url;
+    // After job completes, local URL is saved
+    const localUrl = `/audio/pois/${poiId}_${lang}.mp3`;
+    audioUrls[lang] = localUrl;
   }
   
   // Update DB with audio URLs
@@ -810,10 +810,10 @@ save 900 1        # Save every 15 min if at least 1 key changed
 save 300 10       # Save every 5 min if at least 10 keys changed
 ```
 
-### 9.3 S3 Versioning
+### 9.3 Local Media Versioning
 
-- Enable S3 versioning cho file storage
-- Audio files có immutable tên (based on POI version)
+- Use content_version in audio filename for immutable local media path
+- Keep old files until retention cleanup job runs
 
 ---
 

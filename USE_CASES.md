@@ -372,7 +372,7 @@ User accesses Settings screen to change preferred language. When language is cha
 | 3 | Selects new language (e.g., "한국어") | System updates preference state | `zustand` store update + `SecureStore` save |
 | 4 | | Re-queries SQLite with new language | Fetch all POIs filtered by new language |
 | 5 | | Updates map display (names, descriptions) | Re-render POI popup text |
-| 6 | | Downloads new audio URLs if not cached | Check S3 for new language MP3s |
+| 6 | | Downloads new audio URLs if not cached | Check backend local static path for new language MP3s |
 | 7 | User sees all content in Korean | New language active | UI refreshed |
 | 8 | Closes Settings | Returns to map | Map shows Korean text |
 
@@ -391,7 +391,7 @@ User accesses Settings screen to change preferred language. When language is cha
 **A1: Language Audio Not Yet Downloaded**
 - Selected language audio files not cached locally
 - Show progress: "Tải dữ liệu tiếng..."
-- Auto-download MP3s in background from S3
+- Auto-download MP3s in background from backend local static path
 - Once complete, language ready to use
 
 **A2: Network Offline, Language Audio Missing**
@@ -668,7 +668,7 @@ The system includes:
 - ✅ Mobile app (React Native)
 - ✅ Backend API (Node.js)
 - ✅ PostgreSQL database
-- ✅ S3/file storage
+- ✅ Local file storage
 - ❌ Admin dashboard (separate system)
 - ❌ Payment gateway (external service)
 

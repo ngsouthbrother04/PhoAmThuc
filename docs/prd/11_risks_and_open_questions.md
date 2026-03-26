@@ -19,6 +19,6 @@
 | ID | Question | Priority | Owner |
 |---|---|---|---|
 | Q-001 | Final production token expiration and refresh policy? | High | Product + Security |
-| Q-002 | S3 vs local filesystem final decision for production media? | High | Platform |
+| Q-002 | Cloudinary folder/transform policy and retention strategy for production images? | High | Platform |
 | Q-003 | Admin publish model: always full sync or selective scope by entity? | Medium | Product + Backend |
 | Q-004 | Post-MVP social/review roadmap sequencing? | Medium | Product |

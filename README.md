@@ -183,8 +183,8 @@ This file defines:
 | Framework | Express.js + TypeScript | REST API |
 | Database | PostgreSQL 14+ (with PostGIS) | Primary source of truth |
 | Cache | Redis | Query caching, sync manifest |
-| **TTS Engine** | **Google Cloud TTS / Azure / Festival** | **Background job queue** (NOT on-device) |
-| Storage | AWS S3 or Local FS | Audio & media files |
+| **TTS Engine** | **Piper (offline, free, no account)** | **Background job queue** (NOT on-device) |
+| Storage | Audio local filesystem + Image Cloudinary | Media files |
 | ORM | Prisma | Type-safe database access |
 | Jobs | BullMQ / Node-Schedule | Background TTS processing |
 
