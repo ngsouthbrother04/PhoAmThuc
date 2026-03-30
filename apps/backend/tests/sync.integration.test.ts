@@ -6,6 +6,7 @@ import prisma from '../src/lib/prisma';
 import syncRouter from '../src/routes/api/sync';
 import { errorHandlingMiddleware, notFoundMiddleware } from '../src/middlewares/errorHandlingMiddleware';
 import { buildSeedDataset } from '../src/services/seedService';
+import { createAuthToken } from '../src/services/authService';
 
 const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
 const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
@@ -97,9 +98,11 @@ describeIfDb('SYNC integration with real Prisma', () => {
   it('GET /api/v1/sync/full should include seeded POIs and Tours with correct values', async () => {
     const app = createApp();
 
+    const { token } = createAuthToken('integration-test');
+    
     const res = await request(app)
       .get('/api/v1/sync/full?version=0')
-      .set('Authorization', 'Bearer integration-test-token');
+      .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
     expect(res.body.contentVersion).toBeGreaterThanOrEqual(contentVersion);
@@ -138,9 +141,11 @@ describeIfDb('SYNC integration with real Prisma', () => {
     expect(manifestRes.status).toBe(200);
 
     const currentVersion = manifestRes.body.contentVersion;
+    const { token } = createAuthToken('integration-test');
+    
     const fullRes = await request(app)
       .get(`/api/v1/sync/full?version=${currentVersion}`)
-      .set('Authorization', 'Bearer integration-test-token');
+      .set('Authorization', `Bearer ${token}`);
 
     expect(fullRes.status).toBe(200);
     expect(fullRes.body.contentVersion).toBe(currentVersion);

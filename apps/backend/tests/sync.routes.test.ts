@@ -9,7 +9,12 @@ vi.mock('../src/services/syncService', () => ({
   getSyncFull: vi.fn()
 }));
 
+vi.mock('../src/services/authService', () => ({
+  verifyJwt: vi.fn()
+}));
+
 import { getSyncFull, getSyncManifest } from '../src/services/syncService';
+import { verifyJwt } from '../src/services/authService';
 
 function createApp() {
   const app = express();
@@ -23,6 +28,7 @@ function createApp() {
 describe('SYNC routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(verifyJwt).mockReturnValue({ sub: 'user-id' });
   });
 
   it('GET /api/v1/sync/manifest should return manifest payload', async () => {
@@ -48,7 +54,19 @@ describe('SYNC routes', () => {
     const res = await request(app).get('/api/v1/sync/full');
 
     expect(res.status).toBe(401);
-    expect(res.body.message).toContain('Authorization Bearer token');
+    expect(res.body.message).toContain('Thiếu hoặc sai định dạng Authorization Bearer token.');
+  });
+
+  it('GET /api/v1/sync/full should return 401 on invalid token signature', async () => {
+    const app = createApp();
+    vi.mocked(verifyJwt).mockImplementation(() => { throw new Error('INVALID_SIGNATURE'); });
+
+    const res = await request(app)
+      .get('/api/v1/sync/full')
+      .set('Authorization', 'Bearer fake-token-invalid');
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toContain('Token rỗng hoặc không hợp lệ.');
   });
 
   it('GET /api/v1/sync/full should return 400 for invalid version query', async () => {

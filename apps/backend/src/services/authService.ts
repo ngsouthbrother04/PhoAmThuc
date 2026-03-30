@@ -51,7 +51,12 @@ export interface PaymentFinalizeResult {
 const DEFAULT_CLAIM_CODES = ['ABC123', 'FOODIE2026', 'LINHUNGVIP'];
 
 const TOKEN_TTL_SECONDS = Number(process.env.AUTH_TOKEN_TTL_SECONDS ?? 24 * 60 * 60);
+
 const TOKEN_SECRET = process.env.AUTH_JWT_SECRET ?? 'dev-only-auth-secret-change-me';
+const TOKEN_SECRETS = process.env.AUTH_JWT_SECRETS 
+  ? process.env.AUTH_JWT_SECRETS.split(',').map(s => s.trim()).filter(Boolean)
+  : [TOKEN_SECRET];
+const CURRENT_KID = process.env.AUTH_JWT_KID ?? '1';
 
 function base64UrlEncode(input: string): string {
   return Buffer.from(input)
@@ -62,12 +67,15 @@ function base64UrlEncode(input: string): string {
 }
 
 function signJwt(payload: Record<string, unknown>): string {
-  const header = { alg: 'HS256', typ: 'JWT' };
+  const header = { alg: 'HS256', typ: 'JWT', kid: CURRENT_KID };
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const data = `${encodedHeader}.${encodedPayload}`;
+  
+  const activeSecret = TOKEN_SECRETS[0] ?? TOKEN_SECRET;
+  
   const signature = crypto
-    .createHmac('sha256', TOKEN_SECRET)
+    .createHmac('sha256', activeSecret)
     .update(data)
     .digest('base64')
     .replace(/=/g, '')
@@ -77,11 +85,58 @@ function signJwt(payload: Record<string, unknown>): string {
   return `${data}.${signature}`;
 }
 
+export function verifyJwt(token: string): any {
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    throw new Error('INVALID_TOKEN_FORMAT');
+  }
+
+  const [encodedHeader, encodedPayload, signature] = parts;
+  const data = `${encodedHeader}.${encodedPayload}`;
+
+  let payloadObj;
+  try {
+    payloadObj = JSON.parse(Buffer.from(encodedPayload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
+  } catch (err) {
+    throw new Error('INVALID_TOKEN_ENCODING');
+  }
+
+  let isValid = false;
+  // Key Rotation Vault Check
+  for (const secret of TOKEN_SECRETS) {
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(data)
+      .digest('base64')
+      .replace(/=/g, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_');
+
+    try {
+      isValid = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+      if (isValid) break;
+    } catch {
+      continue;
+    }
+  }
+
+  if (!isValid) {
+    throw new Error('INVALID_SIGNATURE');
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (payloadObj.exp && payloadObj.exp < nowSeconds) {
+    throw new Error('TOKEN_EXPIRED');
+  }
+
+  return payloadObj;
+}
+
 function toSafeClaimCode(rawCode: string): string {
   return rawCode.trim().toUpperCase();
 }
 
-function createAuthToken(subject: string): { token: string; expiresIn: number } {
+export function createAuthToken(subject: string): { token: string; expiresIn: number } {
   const nowSeconds = Math.floor(Date.now() / 1000);
   const payload = {
     sub: subject,

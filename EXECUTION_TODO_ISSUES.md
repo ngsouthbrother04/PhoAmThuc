@@ -115,6 +115,12 @@ Priority: P1
 Scope: Build tour list/detail, active tour mode, and map filtering by ordered tour stops from local SQLite.
 Acceptance mapping: UC7, TC-7.x
 
+### ISSUE-014 - Webhook signature verifier & Payment integration tests
+Status: DONE
+Priority: P1
+Scope: Implement gateway-specific signature verifiers for VNPay and MoMo. Add integration tests against test DB for payment callback idempotency and finalize logic.
+Target files: apps/backend/src/utils/paymentVerifier.ts, apps/backend/tests/payment.integration.test.ts
+
 ## Sprint S3 (Quality + Hardening)
 
 ### ISSUE-012 - Unit tests for State Machine
@@ -128,6 +134,12 @@ Status: TODO
 Priority: P1
 Scope: Validate end-to-end critical scenarios across UC1~UC8, including offline sync, i18n fallback, QR errors, and analytics buffering/upload.
 Acceptance mapping: docs/test_scenarios.md (Functional + Integration + Performance subsets)
+
+### ISSUE-015 - JWT Key Rotation & Security Middleware
+Status: DONE
+Priority: P1
+Scope: Implement JWT key rotation strategy (kid header, multi-secret support) and strict auth middleware to secure API endpoints. Include tests for expired/invalid signatures.
+Target files: apps/backend/src/services/authService.ts, apps/backend/src/middlewares/authMiddleware.ts, apps/backend/tests/jwt-rotation.test.ts
 
 ## Current blockers snapshot
 1. Mobile dependencies required by canonical spec are not installed yet.
@@ -166,15 +178,12 @@ Release scope:
 
 ### Residual risks
 
-| Risk | Level | Impact | Mitigation / Next action |
-|---|---|---|---|
-| Provider-specific webhook verification not yet fully aligned to real VNPay/MoMo signature specs | MEDIUM | Callback security may not match production gateway requirements | Implement gateway-specific verifier per provider docs before production rollout |
-| Payment finalize/idempotency paths still lack dedicated DB integration tests | LOW | Runtime regressions in payment callback transaction edges may be missed | Add integration tests against test DB for payment finalize/idempotency paths |
-| Auth token generation currently uses internal JWT signing without key rotation workflow | LOW | Long-term ops/security maintainability risk | Add key rotation strategy and secret management policy for production |
+*Update (2026-03-30): All residual risks from S1 have been resolved in Sprint S2 and Sprint S3.*
+
+| Risk | Level | Impact | Mitigation / Next action | Status |
+|---|---|---|---|---|
+| Provider-specific webhook verification not yet fully aligned to real VNPay/MoMo signature specs | MEDIUM | Callback security may not match production gateway requirements | Implement gateway-specific verifier per provider docs before production rollout | **RESOLVED** (`ISSUE-014`) |
+| Payment finalize/idempotency paths still lack dedicated DB integration tests | LOW | Runtime regressions in payment callback transaction edges may be missed | Add integration tests against test DB for payment finalize/idempotency paths | **RESOLVED** (`ISSUE-014`) |
+| Auth token generation currently uses internal JWT signing without key rotation workflow | LOW | Long-term ops/security maintainability risk | Add key rotation strategy and secret management policy for production | **RESOLVED** (`ISSUE-015`) |
 
 ### Go / No-Go
-
-- Recommendation: GO for merge to main for branch 3122560001 scope.
-- Conditions:
-	- Keep provider-specific webhook verification as immediate post-merge hardening ticket for production release.
-	- Keep DB integration tests as next quality increment.

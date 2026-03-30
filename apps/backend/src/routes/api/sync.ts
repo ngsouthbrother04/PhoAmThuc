@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getSyncFull, getSyncManifest } from '../../services/syncService';
+import { requireAuth } from '../../middlewares/authMiddleware';
 import asyncHandler from '../../utils/asyncHandler';
 import ApiError from '../../utils/ApiError';
 
@@ -15,16 +16,8 @@ router.get(
 
 router.get(
   '/full',
+  requireAuth,
   asyncHandler(async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new ApiError(401, 'Thiếu hoặc sai định dạng Authorization Bearer token.');
-    }
-
-    const token = authHeader.slice('Bearer '.length).trim();
-    if (!token) {
-      throw new ApiError(401, 'Token rỗng hoặc không hợp lệ.');
-    }
 
     const requestedVersionRaw = typeof req.query.version === 'string' ? req.query.version : undefined;
     const requestedVersion = requestedVersionRaw ? Number(requestedVersionRaw) : undefined;

@@ -11,7 +11,13 @@ vi.mock('../src/services/authService', () => ({
   finalizePayment: vi.fn()
 }));
 
+vi.mock('../src/utils/paymentVerifier', () => ({
+  verifyVNPaySignature: vi.fn(),
+  verifyMoMoSignature: vi.fn()
+}));
+
 import { claimAccess, finalizePayment, initiatePayment } from '../src/services/authService';
+import { verifyVNPaySignature, verifyMoMoSignature } from '../src/utils/paymentVerifier';
 
 function createApp() {
   const app = express();
@@ -114,5 +120,57 @@ describe('AUTH routes', () => {
     expect(res.status).toBe(200);
     expect(res.body.token).toBe('jwt-1');
     expect(finalizePayment).toHaveBeenCalled();
+  });
+
+  it('POST /api/v1/auth/payment/callback should validate VNPay signature and return token', async () => {
+    const app = createApp();
+    const orderId = 'txn_vnpay_1';
+    
+    vi.mocked(verifyVNPaySignature).mockReturnValue(true);
+    vi.mocked(finalizePayment).mockResolvedValue({
+      orderId,
+      status: 'SUCCEEDED',
+      idempotent: false,
+      token: 'jwt-vnpay',
+      expiresIn: 86400,
+      deviceId: 'dev2'
+    });
+
+    const res = await request(app)
+      .post('/api/v1/auth/payment/callback')
+      .set('x-idempotency-key', 'idem-vnpay')
+      .send({ 
+        orderId, 
+        status: 'success', 
+        deviceId: 'dev2',
+        provider: 'vnpay',
+        gatewayPayload: { vnp_SecureHash: 'test-hash' }
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.token).toBe('jwt-vnpay');
+    expect(verifyVNPaySignature).toHaveBeenCalled();
+    expect(finalizePayment).toHaveBeenCalledWith(expect.objectContaining({
+      signatureHash: 'test-hash'
+    }));
+  });
+
+  it('POST /api/v1/auth/payment/callback should return 401 on invalid VNPay signature', async () => {
+    const app = createApp();
+    
+    vi.mocked(verifyVNPaySignature).mockReturnValue(false);
+
+    const res = await request(app)
+      .post('/api/v1/auth/payment/callback')
+      .set('x-idempotency-key', 'idem-vnpay2')
+      .send({ 
+        orderId: 'txn_vnpay_2', 
+        status: 'success', 
+        provider: 'vnpay',
+        gatewayPayload: { vnp_SecureHash: 'bad-hash' }
+      });
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toContain('Chữ ký callback (gateway hoặc internal) không hợp lệ');
   });
 });

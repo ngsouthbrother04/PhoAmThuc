@@ -2,6 +2,7 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import { PaymentProvider } from '../../generated/prisma/client';
 import { claimAccess, finalizePayment, initiatePayment } from '../../services/authService';
+import { verifyVNPaySignature, verifyMoMoSignature } from '../../utils/paymentVerifier';
 import asyncHandler from '../../utils/asyncHandler';
 import ApiError from '../../utils/ApiError';
 
@@ -113,6 +114,9 @@ router.post(
   const signature = typeof signatureHeader === 'string' ? signatureHeader : '';
   const timestamp = typeof timestampHeader === 'string' ? timestampHeader : '';
 
+  const providerRaw = typeof req.body?.provider === 'string' ? req.body.provider.toLowerCase() : '';
+  const gatewayPayload = typeof req.body?.gatewayPayload === 'object' && req.body.gatewayPayload !== null ? req.body.gatewayPayload : undefined;
+
   const status =
     statusRaw === 'success' || statusRaw === 'succeeded'
       ? 'success'
@@ -126,37 +130,52 @@ router.post(
     throw new ApiError(400, 'Thiếu transactionId/orderId hoặc status không hợp lệ.');
   }
 
-  if (!idempotencyKey || !signature || !timestamp) {
-    throw new ApiError(400, 'Thiếu x-idempotency-key, x-callback-signature hoặc x-callback-timestamp.');
+  if (!idempotencyKey) {
+    throw new ApiError(400, 'Thiếu x-idempotency-key.');
   }
 
-  const callbackTimestampMs = Number(timestamp);
-  if (!Number.isFinite(callbackTimestampMs)) {
-    throw new ApiError(400, 'x-callback-timestamp không hợp lệ.');
-  }
+  let validSignature = false;
+  let signatureHashToSave = signature;
 
-  const nowMs = Date.now();
-  if (Math.abs(nowMs - callbackTimestampMs) > CALLBACK_TTL_SECONDS * 1000) {
-    throw new ApiError(401, 'Callback đã quá hạn hoặc lệch thời gian cho phép.');
-  }
+  if (providerRaw === 'vnpay' && gatewayPayload) {
+    validSignature = verifyVNPaySignature(gatewayPayload as Record<string, string>);
+    signatureHashToSave = (gatewayPayload as Record<string, string>)['vnp_SecureHash'] || 'vnpay-validated';
+  } else if (providerRaw === 'momo' && gatewayPayload) {
+    validSignature = verifyMoMoSignature(gatewayPayload as Record<string, string>);
+    signatureHashToSave = (gatewayPayload as Record<string, string>)['signature'] || 'momo-validated';
+  } else {
+    if (!signature || !timestamp) {
+      throw new ApiError(400, 'Thiếu xác thực (gatewayPayload hoặc x-callback-signature/timestamp).');
+    }
 
-  const validSignature = verifyCallbackSignature({
-    transactionId: transactionIdRaw,
-    status,
-    deviceId,
-    timestamp,
-    signature
-  });
+    const callbackTimestampMs = Number(timestamp);
+    if (!Number.isFinite(callbackTimestampMs)) {
+      throw new ApiError(400, 'x-callback-timestamp không hợp lệ.');
+    }
+
+    const nowMs = Date.now();
+    if (Math.abs(nowMs - callbackTimestampMs) > CALLBACK_TTL_SECONDS * 1000) {
+      throw new ApiError(401, 'Callback đã quá hạn hoặc lệch thời gian cho phép.');
+    }
+
+    validSignature = verifyCallbackSignature({
+      transactionId: transactionIdRaw,
+      status,
+      deviceId,
+      timestamp,
+      signature
+    });
+  }
 
   if (!validSignature) {
-    throw new ApiError(401, 'Chữ ký callback không hợp lệ.');
+    throw new ApiError(401, 'Chữ ký callback (gateway hoặc internal) không hợp lệ.');
   }
 
   const finalized = await finalizePayment({
     transactionId: transactionIdRaw,
     status,
     idempotencyKey,
-    signatureHash: signature,
+    signatureHash: signatureHashToSave,
     deviceId
   });
 
