@@ -55,7 +55,10 @@
 | `analytics_events` | Sự kiện phát audio, tap, etc | 10K-100K/day |
 | `payment_transactions` | Lịch sử thanh toán | 10-100/day |
 | `payment_callback_events` | Webhook từ VNPay/Momo | 10-100/day |
+| `auth_sessions` | Refresh token/session lifecycle | 100-1000 |
 | `app_settings` | Cấu hình toàn hệ thống | <10 |
+| `sync_change_logs` | Nguồn dữ liệu cho incremental sync | 1K-100K/day |
+| `analytics_presence` | Presence window cho online_now/active_5m | 100-10K |
 
 ---
 
@@ -84,6 +87,9 @@ CREATE TABLE points_of_interest (
   -- POI metadata
   type PoiType NOT NULL DEFAULT 'FOOD',  -- FOOD, DRINK, SNACK, WC
   image VARCHAR(2048),  -- URL to main image (Cloudinary)
+  is_published BOOLEAN NOT NULL DEFAULT false,
+  published_at TIMESTAMP,
+  deleted_at TIMESTAMP,
   
   -- Content versioning (for sync)
   content_version INT NOT NULL DEFAULT 1,
@@ -171,6 +177,9 @@ CREATE TABLE tours (
   
   -- Media
   image VARCHAR(2048),  -- Tour banner image
+  is_published BOOLEAN NOT NULL DEFAULT false,
+  published_at TIMESTAMP,
+  deleted_at TIMESTAMP,
   
   -- Versioning
   content_version INT NOT NULL DEFAULT 1,
@@ -219,16 +228,15 @@ CREATE TABLE users (
   device_id VARCHAR(255) NOT NULL UNIQUE,  -- Device identifier
   session_id VARCHAR(255),  -- Current session
   
-  -- Authorization
-  claim_code VARCHAR(50),  -- Mã claim hoặc voucher
-  auth_token VARCHAR(500),  -- Current JWT token
-  token_expires_at TIMESTAMP,
+  -- Authorization and links
+  claim_code_id UUID REFERENCES claim_codes(id) ON DELETE SET NULL,
   
   -- Preferences
   preferred_language VARCHAR(10) DEFAULT 'vi',  -- Last selected language
   
   -- Status
   is_active BOOLEAN DEFAULT true,
+  last_seen_at TIMESTAMP,
   
   -- Timestamps
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -237,8 +245,34 @@ CREATE TABLE users (
 );
 
 CREATE INDEX idx_users_device_id ON users(device_id);
-CREATE INDEX idx_users_claim_code ON users(claim_code);
+CREATE INDEX idx_users_claim_code_id ON users(claim_code_id);
 CREATE INDEX idx_users_active ON users(is_active);
+```
+
+---
+
+#### **Table: auth_sessions**
+
+**Mục đích**: Quản lý refresh token, revoke/logout, và vòng đời session
+
+```sql
+CREATE TABLE auth_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  device_id VARCHAR(255) NOT NULL,
+  refresh_token_hash VARCHAR(255) NOT NULL UNIQUE,
+  access_token_jti VARCHAR(255) UNIQUE,
+  issued_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP NOT NULL,
+  revoked_at TIMESTAMP,
+  last_used_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_auth_sessions_user_id ON auth_sessions(user_id);
+CREATE INDEX idx_auth_sessions_device_id ON auth_sessions(device_id);
+CREATE INDEX idx_auth_sessions_expires_at ON auth_sessions(expires_at);
 ```
 
 ---
@@ -292,7 +326,7 @@ CREATE TABLE analytics_events (
   poi_id UUID REFERENCES points_of_interest(id) ON DELETE SET NULL,
   
   -- Event data
-  action VARCHAR(50) NOT NULL,  -- PLAY, PAUSE, STOP, QR_SCAN, TAP
+  action VARCHAR(50) NOT NULL,  -- PLAY, PAUSE, STOP, QR_SCAN
   duration_ms INT,  -- Playback duration if applicable
   language VARCHAR(10),  -- Language selected when event occurred
   
@@ -359,6 +393,9 @@ CREATE INDEX idx_analytics_action ON analytics_events(action);
 CREATE TABLE payment_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
+  -- Internal transaction
+  transaction_id VARCHAR(255) NOT NULL UNIQUE,
+
   -- Payment info
   user_id UUID REFERENCES users(id) ON DELETE SET NULL,
   amount INT NOT NULL,  -- In VND or smallest unit
@@ -373,6 +410,11 @@ CREATE TABLE payment_transactions (
   
   -- Metadata
   metadata JSONB,  -- { "description": "Tour access", "item_id": "tour_001" }
+
+  -- Callback and expiry
+  return_url VARCHAR(2048),
+  payment_url VARCHAR(2048) NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
   
   -- Timestamps
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -394,14 +436,20 @@ CREATE INDEX idx_payment_transactions_provider_id ON payment_transactions(provid
 ```sql
 CREATE TABLE payment_callback_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- Idempotency & signature hardening
+  idempotency_key VARCHAR(255) NOT NULL UNIQUE,
   
   -- Callback info
-  transaction_id UUID REFERENCES payment_transactions(id) ON DELETE SET NULL,
+  transaction_id VARCHAR(255) REFERENCES payment_transactions(transaction_id) ON DELETE CASCADE,
   provider VARCHAR(50) NOT NULL,
   
   -- Callback content
   callback_data JSONB NOT NULL,  -- Raw callback from provider
   
+  signature_hash VARCHAR(255) NOT NULL,
+  status VARCHAR(50) NOT NULL,
+
   -- Processing status
   processed BOOLEAN DEFAULT true,
   error_message VARCHAR(500),
@@ -428,6 +476,8 @@ CREATE TABLE app_settings (
   -- Sync manifest
   current_version INT NOT NULL DEFAULT 1,
   data_checksum VARCHAR(64),  -- SHA256 hash of all POI data
+  media_base_path VARCHAR(255) NOT NULL DEFAULT '/audio/',
+  delta_window_versions INT NOT NULL DEFAULT 5,
   
   -- Feature flags
   features JSONB DEFAULT '{}',  -- { "enableQRScan": true, "maintenanceMode": false }
@@ -436,6 +486,46 @@ CREATE TABLE app_settings (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+```
+
+---
+
+#### **Table: sync_change_logs**
+
+**Mục đích**: Lưu lịch sử thay đổi theo version để phục vụ `POST /sync/incremental`
+
+```sql
+CREATE TABLE sync_change_logs (
+  id BIGSERIAL PRIMARY KEY,
+  entity_type VARCHAR(20) NOT NULL,  -- POI, TOUR
+  entity_id UUID NOT NULL,
+  action VARCHAR(20) NOT NULL,  -- UPSERT, DELETE, PUBLISH, UNPUBLISH
+  content_version INT NOT NULL,
+  changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  metadata JSONB DEFAULT '{}'
+);
+
+CREATE INDEX idx_sync_change_logs_entity_version ON sync_change_logs(entity_type, content_version);
+CREATE INDEX idx_sync_change_logs_version ON sync_change_logs(content_version);
+```
+
+---
+
+#### **Table: analytics_presence**
+
+**Mục đích**: Duy trì trạng thái heartbeat mới nhất cho `online_now` và `active_5m`
+
+```sql
+CREATE TABLE analytics_presence (
+  device_id VARCHAR(255) PRIMARY KEY,
+  session_id VARCHAR(255) NOT NULL,
+  language VARCHAR(10),
+  last_heartbeat_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_analytics_presence_last_heartbeat_at ON analytics_presence(last_heartbeat_at);
 ```
 
 ---
@@ -472,11 +562,25 @@ enum PaymentStatus {
   CANCELLED
   EXPIRED
 }
+
+enum SyncEntityType {
+  POI
+  TOUR
+}
+
+enum SyncAction {
+  UPSERT
+  DELETE
+  PUBLISH
+  UNPUBLISH
+}
 ```
 
 ---
 
 ## 4. Relationship Diagram
+
+Lưu ý: sơ đồ dưới đây là bản rút gọn cho domain chính. Các bảng bổ sung để sẵn sàng API trong PRD/backend_design gồm: `auth_sessions`, `app_settings`, `sync_change_logs`, `analytics_presence`.
 
 ```
 ┌──────────────────────────────┐

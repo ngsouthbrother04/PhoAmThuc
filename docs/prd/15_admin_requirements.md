@@ -24,7 +24,15 @@ Admin operates CMS workflows for POI, tours, localization, media, and publish li
 2. TTS pipeline runs asynchronously and is observable.
 3. Analytics views derive from analytics_events and related aggregates.
 
-## 4. Admin Acceptance Criteria
+## 4. Admin API Contract (Mandatory)
+
+1. CRUD POI: POST /api/v1/admin/pois, GET /api/v1/admin/pois/:id, PUT /api/v1/admin/pois/:id, DELETE /api/v1/admin/pois/:id.
+2. CRUD Tour: POST /api/v1/admin/tours, GET /api/v1/admin/tours/:id, PUT /api/v1/admin/tours/:id, DELETE /api/v1/admin/tours/:id.
+3. Publish flow endpoint: POST /api/v1/admin/pois/:id/publish.
+4. Manifest invalidation endpoint: POST /api/v1/admin/sync/invalidate.
+5. Optional manual audio regeneration endpoint: POST /api/v1/admin/pois/:id/audio/generate.
+
+## 5. Admin Acceptance Criteria
 
 ```gherkin
 GIVEN admin creates or edits POI content
@@ -39,7 +47,7 @@ WHEN mobile client performs sync
 THEN tour appears with preserved order in local SQLite
 ```
 
-## 5. Operational Guardrails
+## 6. Operational Guardrails
 
 1. Admin actions must not alter client invariants around explicit-trigger playback.
 2. Publish flow must keep sync contract compatible with existing mobile clients.

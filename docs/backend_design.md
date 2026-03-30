@@ -49,6 +49,7 @@
 ```
 
 **Thành phần chính**:
+
 - **Mobile App**: React Native (Expo) - Front-end khám phá POI
 - **Backend API**: Node.js 20+ + Express + TypeScript
 - **Database chính**: PostgreSQL (with PostGIS extension)
@@ -78,15 +79,16 @@ Language selection (canonical): query param `?language=vi`
 
 #### **A. Authentication & Authorization**
 
-| Endpoint | Method | Mục đích | Auth |
-|----------|--------|---------|------|
-| `/auth/claim` | POST | Xác thực mã claim/voucher | ❌ |
-| `/auth/payment/initiate` | POST | Khởi tạo thanh toán | ❌ |
-| `/auth/payment/callback` | POST | Xử lý callback/finalize thanh toán | ❌ |
-| `/auth/token-refresh` | POST | Làm mới JWT Token | ✅ |
-| `/auth/logout` | POST | Đăng xuất | ✅ |
+| Endpoint                 | Method | Mục đích                           | Auth |
+| ------------------------ | ------ | ---------------------------------- | ---- |
+| `/auth/claim`            | POST   | Xác thực mã claim/voucher          | ❌   |
+| `/auth/payment/initiate` | POST   | Khởi tạo thanh toán                | ❌   |
+| `/auth/payment/callback` | POST   | Xử lý callback/finalize thanh toán | ❌   |
+| `/auth/token-refresh`    | POST   | Làm mới JWT Token                  | ✅   |
+| `/auth/logout`           | POST   | Đăng xuất                          | ✅   |
 
 **Request/Response ví dụ**:
+
 ```json
 // POST /auth/claim
 {
@@ -110,13 +112,14 @@ Language selection (canonical): query param `?language=vi`
 
 #### **B. Synchronization (Offline-First)**
 
-| Endpoint | Method | Mục đích | Auth |
-|----------|--------|---------|------|
-| `/sync/manifest` | GET | Lấy thông tin version hiện tại | ✅ |
-| `/sync/full` | GET | Tải toàn bộ POI & Tour data | ✅ |
-| `/sync/incremental` | POST | Cập nhật theo version delta | ✅ |
+| Endpoint            | Method | Mục đích                       | Auth |
+| ------------------- | ------ | ------------------------------ | ---- |
+| `/sync/manifest`    | GET    | Lấy thông tin version hiện tại | ✅   |
+| `/sync/full`        | GET    | Tải toàn bộ POI & Tour data    | ✅   |
+| `/sync/incremental` | POST   | Cập nhật theo version delta    | ✅   |
 
 **Request/Response ví dụ**:
+
 ```json
 // GET /sync/manifest
 // Response 200
@@ -141,20 +144,43 @@ Language selection (canonical): query param `?language=vi`
     "metadata": { "version": 3, "count": 45 }
   }
 }
+
+// POST /sync/incremental
+{
+  "fromVersion": 2,
+  "language": "vi"
+}
+
+// Response 200
+{
+  "status": "success",
+  "data": {
+    "fromVersion": 2,
+    "toVersion": 3,
+    "changes": {
+      "pois": [ /* changed POIs */ ],
+      "tours": [ /* changed tours */ ],
+      "deletedPoiIds": [],
+      "deletedTourIds": []
+    },
+    "requiresFullSync": false
+  }
+}
 ```
 
 ---
 
 #### **C. POI Query & Discovery**
 
-| Endpoint | Method | Mục đích | Auth |
-|----------|--------|---------|------|
-| `/pois` | GET | Lấy danh sách POI (paginated) | ✅ |
-| `/pois/:id` | GET | Chi tiết POI cụ thể | ✅ |
-| `/pois/search/radius` | POST | Tìm POI trong bán kính | ✅ |
-| `/pois/:id/audio/:language` | GET | Tải file audio cụ thể | ✅ |
+| Endpoint                    | Method | Mục đích                      | Auth |
+| --------------------------- | ------ | ----------------------------- | ---- |
+| `/pois`                     | GET    | Lấy danh sách POI (paginated) | ✅   |
+| `/pois/:id`                 | GET    | Chi tiết POI cụ thể           | ✅   |
+| `/pois/search/radius`       | POST   | Tìm POI trong bán kính        | ✅   |
+| `/pois/:id/audio/:language` | GET    | Tải file audio cụ thể         | ✅   |
 
 **Request/Response ví dụ**:
+
 ```json
 // POST /pois/search/radius
 {
@@ -191,13 +217,14 @@ Language selection (canonical): query param `?language=vi`
 
 #### **D. Tours (Lộ trình Ẩm thực)**
 
-| Endpoint | Method | Mục đích | Auth |
-|----------|--------|---------|------|
-| `/tours` | GET | Danh sách tour | ✅ |
-| `/tours/:id` | GET | Chi tiết tour + POI list | ✅ |
-| `/tours/:id/pois` | GET | POI trong tour (ordered) | ✅ |
+| Endpoint          | Method | Mục đích                 | Auth |
+| ----------------- | ------ | ------------------------ | ---- |
+| `/tours`          | GET    | Danh sách tour           | ✅   |
+| `/tours/:id`      | GET    | Chi tiết tour + POI list | ✅   |
+| `/tours/:id/pois` | GET    | POI trong tour (ordered) | ✅   |
 
 **Response ví dụ**:
+
 ```json
 // GET /tours/tour_001
 {
@@ -218,13 +245,14 @@ Language selection (canonical): query param `?language=vi`
 
 #### **E. Analytics & Usage Tracking**
 
-| Endpoint | Method | Mục đích | Auth |
-|----------|--------|---------|------|
-| `/analytics/events` | POST | Upload batch sự kiện | ✅ |
-| `/analytics/presence/heartbeat` | POST | Gửi heartbeat phục vụ dashboard online users | ✅ |
-| `/analytics/stats` | GET | Thống kê sử dụng cá nhân | ✅ |
+| Endpoint                        | Method | Mục đích                                     | Auth |
+| ------------------------------- | ------ | -------------------------------------------- | ---- |
+| `/analytics/events`             | POST   | Upload batch sự kiện                         | ✅   |
+| `/analytics/presence/heartbeat` | POST   | Gửi heartbeat phục vụ dashboard online users | ✅   |
+| `/analytics/stats`              | GET    | Thống kê sử dụng cá nhân                     | ✅   |
 
 **Request ví dụ**:
+
 ```json
 // POST /analytics/events
 {
@@ -268,13 +296,567 @@ Language selection (canonical): query param `?language=vi`
 
 #### **F. Admin/CMS Endpoints (Protected)**
 
-| Endpoint | Method | Mục đích | Auth | Role |
-|----------|--------|---------|------|------|
-| `/admin/pois` | POST | Tạo POI mới | ✅ | ADMIN |
-| `/admin/pois/:id` | PUT | Cập nhật POI | ✅ | ADMIN |
-| `/admin/pois/:id/publish` | POST | Publish POI → khách | ✅ | ADMIN |
-| `/admin/pois/:id/audio/generate` | POST | Trigger TTS generation | ✅ | ADMIN |
-| `/admin/sync/invalidate` | POST | Force client resync | ✅ | ADMIN |
+| Endpoint                         | Method | Mục đích                      | Auth | Role  |
+| -------------------------------- | ------ | ----------------------------- | ---- | ----- |
+| `/admin/pois`                    | POST   | Tạo POI mới                   | ✅   | ADMIN |
+| `/admin/pois/:id`                | GET    | Lấy chi tiết POI phục vụ CMS  | ✅   | ADMIN |
+| `/admin/pois/:id`                | PUT    | Cập nhật POI                  | ✅   | ADMIN |
+| `/admin/pois/:id`                | DELETE | Xóa POI                       | ✅   | ADMIN |
+| `/admin/tours`                   | POST   | Tạo tour mới                  | ✅   | ADMIN |
+| `/admin/tours/:id`               | GET    | Lấy chi tiết tour phục vụ CMS | ✅   | ADMIN |
+| `/admin/tours/:id`               | PUT    | Cập nhật tour                 | ✅   | ADMIN |
+| `/admin/tours/:id`               | DELETE | Xóa tour                      | ✅   | ADMIN |
+| `/admin/pois/:id/publish`        | POST   | Publish POI → khách           | ✅   | ADMIN |
+| `/admin/pois/:id/audio/generate` | POST   | Trigger TTS generation        | ✅   | ADMIN |
+| `/admin/sync/invalidate`         | POST   | Force client resync           | ✅   | ADMIN |
+
+---
+
+### 2.2.1 JSON Response Matrix Theo Từng Trường Hợp
+
+Mục này chuẩn hoa mau response cho tung endpoint theo cac truong hop pho bien (success + loi nghiep vu/bao mat).
+
+#### A. Authentication & Authorization
+
+**POST `/auth/claim`**
+
+```json
+// 200 - Claim code hop le
+{
+  "status": "success",
+  "authToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresIn": 86400,
+  "user": {
+    "id": "user_123",
+    "deviceId": "device_xyz",
+    "claimCode": "PHOAMTHUC2026"
+  }
+}
+
+// 400 - Claim code khong hop le/het han
+{
+  "status": "error",
+  "error": {
+    "code": "INVALID_OR_EXPIRED_CLAIM_CODE",
+    "message": "Ma xac thuc khong hop le hoac da het han",
+    "timestamp": "2026-03-30T10:00:00Z"
+  }
+}
+```
+
+**POST `/auth/payment/initiate`**
+
+```json
+// 200 - Khoi tao thanh toan thanh cong
+{
+  "status": "success",
+  "data": {
+    "provider": "VNPAY",
+    "transactionId": "txn_001",
+    "paymentUrl": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?...",
+    "expiresAt": "2026-03-30T10:15:00Z"
+  }
+}
+
+// 400 - Provider hoac amount khong hop le
+{
+  "status": "error",
+  "error": {
+    "code": "INVALID_PAYMENT_REQUEST",
+    "message": "Thong tin thanh toan khong hop le",
+    "timestamp": "2026-03-30T10:00:00Z"
+  }
+}
+```
+
+**POST `/auth/payment/callback`**
+
+```json
+// 200 - Callback hop le, giao dich thanh cong
+{
+  "status": "success",
+  "data": {
+    "transactionId": "txn_001",
+    "paymentStatus": "SUCCEEDED",
+    "userAuthorized": true
+  }
+}
+
+// 401 - Sai chu ky callback
+{
+  "status": "error",
+  "error": {
+    "code": "INVALID_PAYMENT_SIGNATURE",
+    "message": "Chu ky callback khong hop le",
+    "timestamp": "2026-03-30T10:00:00Z"
+  }
+}
+```
+
+**POST `/auth/token-refresh`**
+
+```json
+// 200 - Refresh token thanh cong
+{
+  "status": "success",
+  "data": {
+    "authToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.new...",
+    "expiresIn": 86400
+  }
+}
+
+// 401 - Refresh token het han/khong hop le
+{
+  "status": "error",
+  "error": {
+    "code": "INVALID_REFRESH_TOKEN",
+    "message": "Refresh token khong hop le hoac da het han",
+    "timestamp": "2026-03-30T10:00:00Z"
+  }
+}
+```
+
+**POST `/auth/logout`**
+
+```json
+// 200 - Dang xuat thanh cong
+{
+  "status": "success",
+  "message": "Dang xuat thanh cong"
+}
+
+// 401 - Token khong hop le
+{
+  "status": "error",
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Token khong hop le hoac da het han",
+    "timestamp": "2026-03-30T10:00:00Z"
+  }
+}
+```
+
+#### B. Synchronization (Offline-First)
+
+**GET `/sync/manifest`**
+
+```json
+// 200 - Co thong tin manifest moi nhat
+{
+  "status": "success",
+  "data": {
+    "serverVersion": 3,
+    "dataChecksum": "abc123def456",
+    "lastUpdated": "2026-03-24T15:30:00Z",
+    "requiresFullSync": false,
+    "mediaBasePath": "/audio/"
+  }
+}
+```
+
+**GET `/sync/full`**
+
+```json
+// 200 - Can full sync
+{
+  "status": "success",
+  "data": {
+    "needsSync": true,
+    "version": 3,
+    "pois": [],
+    "tours": [],
+    "metadata": {
+      "count": 45,
+      "syncedAt": "2026-03-30T10:00:00Z"
+    }
+  }
+}
+
+// 200 - Short-circuit khi da dong bo
+{
+  "status": "success",
+  "data": {
+    "needsSync": false,
+    "version": 3,
+    "message": "Client is up-to-date"
+  }
+}
+```
+
+**POST `/sync/incremental`**
+
+```json
+// 200 - Delta sync thanh cong
+{
+  "status": "success",
+  "data": {
+    "fromVersion": 2,
+    "toVersion": 3,
+    "changes": {
+      "pois": [],
+      "tours": [],
+      "deletedPoiIds": [],
+      "deletedTourIds": []
+    },
+    "requiresFullSync": false
+  }
+}
+
+// 409 - Delta qua xa, bat buoc full sync
+{
+  "status": "error",
+  "error": {
+    "code": "DELTA_WINDOW_EXCEEDED",
+    "message": "Khong the delta sync tu version hien tai, vui long full sync",
+    "timestamp": "2026-03-30T10:00:00Z"
+  },
+  "data": {
+    "requiresFullSync": true
+  }
+}
+```
+
+#### C. POI Query & Discovery
+
+**GET `/pois`**
+
+```json
+// 200 - Lay danh sach POI phan trang
+{
+  "status": "success",
+  "data": {
+    "items": [],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 45,
+      "totalPages": 3
+    }
+  }
+}
+```
+
+**GET `/pois/:id`**
+
+```json
+// 200 - Lay chi tiet POI
+{
+  "status": "success",
+  "data": {
+    "id": "poi_001",
+    "name": "Pho Thin",
+    "description": "Famous beef pho...",
+    "audioUrl": "/audio/poi_001_en.mp3"
+  }
+}
+
+// 404 - Khong tim thay POI
+{
+  "status": "error",
+  "error": {
+    "code": "POI_NOT_FOUND",
+    "message": "Khong tim thay dia diem",
+    "timestamp": "2026-03-30T10:00:00Z"
+  }
+}
+```
+
+**POST `/pois/search/radius`**
+
+```json
+// 200 - Tim thay POI trong ban kinh
+{
+  "status": "success",
+  "data": {
+    "items": [],
+    "meta": {
+      "radiusM": 500,
+      "center": { "latitude": 21.0285, "longitude": 105.8542 }
+    }
+  }
+}
+
+// 400 - Toa do/radius khong hop le
+{
+  "status": "error",
+  "error": {
+    "code": "INVALID_GEO_INPUT",
+    "message": "Latitude/longitude/radius khong hop le",
+    "timestamp": "2026-03-30T10:00:00Z"
+  }
+}
+```
+
+**GET `/pois/:id/audio/:language`**
+
+```json
+// 200 - Tra URL tai audio
+{
+  "status": "success",
+  "data": {
+    "poiId": "poi_001",
+    "language": "en",
+    "audioUrl": "/audio/poi_001_en.mp3"
+  }
+}
+
+// 404 - Chua co audio theo ngon ngu
+{
+  "status": "error",
+  "error": {
+    "code": "AUDIO_NOT_FOUND",
+    "message": "Chua co audio cho ngon ngu nay",
+    "timestamp": "2026-03-30T10:00:00Z"
+  }
+}
+```
+
+#### D. Tours
+
+**GET `/tours`**
+
+```json
+// 200 - Danh sach tours
+{
+  "status": "success",
+  "data": {
+    "items": []
+  }
+}
+```
+
+**GET `/tours/:id`**
+
+```json
+// 200 - Chi tiet tour
+{
+  "status": "success",
+  "data": {
+    "id": "tour_001",
+    "name": "Student Street Food",
+    "poiIds": ["poi_001", "poi_003", "poi_005"]
+  }
+}
+
+// 404 - Tour khong ton tai
+{
+  "status": "error",
+  "error": {
+    "code": "TOUR_NOT_FOUND",
+    "message": "Khong tim thay tour",
+    "timestamp": "2026-03-30T10:00:00Z"
+  }
+}
+```
+
+**GET `/tours/:id/pois`**
+
+```json
+// 200 - Danh sach POI theo thu tu tour
+{
+  "status": "success",
+  "data": {
+    "tourId": "tour_001",
+    "items": []
+  }
+}
+```
+
+#### E. Analytics
+
+**POST `/analytics/events`**
+
+```json
+// 200 - Nhan batch events thanh cong
+{
+  "status": "success",
+  "processedCount": 12,
+  "failedCount": 0
+}
+
+// 400 - Payload sai schema
+{
+  "status": "error",
+  "error": {
+    "code": "INVALID_ANALYTICS_PAYLOAD",
+    "message": "Danh sach events khong hop le",
+    "timestamp": "2026-03-30T10:00:00Z"
+  }
+}
+```
+
+**POST `/analytics/presence/heartbeat`**
+
+```json
+// 200 - Heartbeat hop le
+{
+  "status": "success",
+  "onlineNowWindowSec": 90,
+  "active5mWindowSec": 300
+}
+```
+
+**GET `/analytics/stats`**
+
+```json
+// 200 - Tong hop thong ke
+{
+  "status": "success",
+  "data": {
+    "plays": 120,
+    "qrScans": 32,
+    "topPois": [{ "poiId": "poi_001", "playCount": 24 }]
+  }
+}
+```
+
+#### F. Admin/CMS
+
+**POST `/admin/pois`**
+
+```json
+// 201 - Tao POI thanh cong
+{
+  "status": "success",
+  "data": {
+    "id": "poi_099",
+    "contentVersion": 1
+  }
+}
+```
+
+**GET `/admin/pois/:id`**
+
+```json
+// 200 - Chi tiet POI cho CMS
+{
+  "status": "success",
+  "data": {
+    "id": "poi_001",
+    "name": { "vi": "Pho Thin", "en": "Pho Thin" },
+    "description": { "vi": "...", "en": "..." },
+    "audioUrls": { "vi": "/audio/poi_001_vi.mp3" }
+  }
+}
+```
+
+**PUT `/admin/pois/:id`**
+
+```json
+// 200 - Cap nhat POI thanh cong
+{
+  "status": "success",
+  "data": {
+    "id": "poi_001",
+    "updated": true
+  }
+}
+```
+
+**DELETE `/admin/pois/:id`**
+
+```json
+// 204 - Xoa POI thanh cong (khong body)
+{}
+```
+
+**POST `/admin/tours`**
+
+```json
+// 201 - Tao tour thanh cong
+{
+  "status": "success",
+  "data": {
+    "id": "tour_099",
+    "contentVersion": 1
+  }
+}
+```
+
+**GET `/admin/tours/:id`**
+
+```json
+// 200 - Chi tiet tour cho CMS
+{
+  "status": "success",
+  "data": {
+    "id": "tour_001",
+    "poiIds": ["poi_001", "poi_003"]
+  }
+}
+```
+
+**PUT `/admin/tours/:id`**
+
+```json
+// 200 - Cap nhat tour thanh cong
+{
+  "status": "success",
+  "data": {
+    "id": "tour_001",
+    "updated": true
+  }
+}
+```
+
+**DELETE `/admin/tours/:id`**
+
+```json
+// 204 - Xoa tour thanh cong (khong body)
+{}
+```
+
+**POST `/admin/pois/:id/publish`**
+
+```json
+// 200 - Publish thanh cong
+{
+  "status": "success",
+  "data": {
+    "poiId": "poi_001",
+    "published": true,
+    "newContentVersion": 4,
+    "syncVersion": 12
+  }
+}
+```
+
+**POST `/admin/pois/:id/audio/generate`**
+
+```json
+// 202 - Da enqueue job tao audio
+{
+  "status": "success",
+  "data": {
+    "poiId": "poi_001",
+    "jobId": "tts:poi_001:vi:4",
+    "state": "queued"
+  }
+}
+```
+
+**POST `/admin/sync/invalidate`**
+
+```json
+// 200 - Tang version sync de client full sync
+{
+  "status": "success",
+  "data": {
+    "invalidated": true,
+    "newSyncVersion": 13
+  }
+}
+
+// 403 - Khong du quyen admin
+{
+  "status": "error",
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Ban khong co quyen thuc hien thao tac nay",
+    "timestamp": "2026-03-30T10:00:00Z"
+  }
+}
+```
 
 ---
 
@@ -295,6 +877,7 @@ Language selection (canonical): query param `?language=vi`
 ```
 
 **Error Response Format**:
+
 ```json
 {
   "status": "error",
@@ -312,12 +895,14 @@ Language selection (canonical): query param `?language=vi`
 
 ### 3.1 Kiến trúc TTS
 
-**Yêu cầu**: 
+**Yêu cầu**:
+
 - Hỗ trợ 15 ngôn ngữ
 - Backend: Server-side TTS generation (không trên mobile)
 - Storage: MP3 files lưu trên local filesystem
 
 **Flow**:
+
 ```
 Admin Input (Text in 15 languages)
   ↓
@@ -341,9 +926,9 @@ Mobile plays from local cache (offline-first)
 
 ### 3.2 Công nghệ TTS Đề xuất
 
-| Công nghệ | Miễn phí | Chất lượng | Dễ sử dụng | Ghi chú |
-|-----------|---------|---------|-----------|---------|
-| **Piper** (Open-source) | Hoàn toàn miễn phí | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | Offline, self-host, không cần account |
+| Công nghệ               | Miễn phí           | Chất lượng | Dễ sử dụng | Ghi chú                               |
+| ----------------------- | ------------------ | ---------- | ---------- | ------------------------------------- |
+| **Piper** (Open-source) | Hoàn toàn miễn phí | ⭐⭐⭐⭐   | ⭐⭐⭐⭐   | Offline, self-host, không cần account |
 
 **Đề xuất cho đồ án**: Piper (offline, free, no account) cho toàn bộ môi trường dev/prod.
 
@@ -397,7 +982,7 @@ Tất cả text content (name, description) được lưu dạng JSON:
 ```typescript
 // app.ts - Language Middleware
 app.use((req, res, next) => {
-  const lang = req.headers['accept-language'] || 'vi';
+  const lang = req.headers["accept-language"] || "vi";
   req.userLanguage = lang;
   next();
 });
@@ -407,9 +992,9 @@ const getPOI = (poiId: string, language: string) => {
   const poi = db.poi.findUnique(poiId);
   return {
     ...poi,
-    name: poi.name[language] || poi.name['vi'],
-    description: poi.description[language] || poi.description['vi'],
-    audioUrl: poi.audioUrls[language] || poi.audioUrls['vi']
+    name: poi.name[language] || poi.name["vi"],
+    description: poi.description[language] || poi.description["vi"],
+    audioUrl: poi.audioUrls[language] || poi.audioUrls["vi"],
   };
 };
 ```
@@ -417,6 +1002,7 @@ const getPOI = (poiId: string, language: string) => {
 ### 4.3 Mobile-side Language Switching
 
 Mobile app sẽ:
+
 1. Lưu user's language preference trong `zustand` store
 2. Khi lấy POI từ SQLite, lọc theo language
 3. Khi submit analytics, ghi lại language được dùng
@@ -428,6 +1014,7 @@ Mobile app sẽ:
 ### 5.1 Điểm Quan Trọng
 
 Theo SPEC_CANONICAL.md:
+
 - ❌ **Không** auto-play audio khi user vào gần POI
 - ✅ **Chỉ** phát audio khi user **Tap** vào marker hoặc scan **QR Code**
 - ✅ GPS tracking là **foreground only** (không background)
@@ -438,17 +1025,17 @@ Theo SPEC_CANONICAL.md:
 // Mobile-side: Location tracking
 const trackLocation = async () => {
   const location = await Location.getCurrentPositionAsync({});
-  
+
   // Update map blue dot
   setUserLocation(location.coords);
-  
+
   // Query nearby POIs (for UI enhancement - NOT auto-play)
   const nearbyPois = await getNearbyPOIs(
     location.coords.latitude,
     location.coords.longitude,
     500 // 500m radius
   );
-  
+
   // Optional: highlight nearby POIs visually
   highlightNearbyMarkers(nearbyPois);
 };
@@ -508,14 +1095,14 @@ TTL: 24 hours (content), 1 hour (dynamic data)
 
 ### 7.1 Technology Stack (Recommended)
 
-| Layer | Tech | Reason |
-|-------|------|--------|
-| **Hosting** | Heroku / Railway.app / Azure App Service | Simple deploy, auto-scaling |
-| **Database** | PostgreSQL (AWS RDS / Azure Database) | Managed, backup, PostGIS support |
-| **Cache** | Redis Cloud / Azure Cache for Redis | Managed redis |
-| **File Storage** | Audio local filesystem + Image Cloudinary | Cost-effective, easy CDN delivery for images |
-| **TTS Compute** | In-process worker (default) or optional serverless worker | Keep one monolith codebase; scale background jobs without splitting into microservices |
-| **Monitoring** | Datadog / New Relic | Real-time performance tracking |
+| Layer            | Tech                                                      | Reason                                                                                 |
+| ---------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **Hosting**      | Heroku / Railway.app / Azure App Service                  | Simple deploy, auto-scaling                                                            |
+| **Database**     | PostgreSQL (AWS RDS / Azure Database)                     | Managed, backup, PostGIS support                                                       |
+| **Cache**        | Redis Cloud / Azure Cache for Redis                       | Managed redis                                                                          |
+| **File Storage** | Audio local filesystem + Image Cloudinary                 | Cost-effective, easy CDN delivery for images                                           |
+| **TTS Compute**  | In-process worker (default) or optional serverless worker | Keep one monolith codebase; scale background jobs without splitting into microservices |
+| **Monitoring**   | Datadog / New Relic                                       | Real-time performance tracking                                                         |
 
 **Monolith note**: Dù dùng worker in-process hay worker serverless tùy chọn, kiến trúc vẫn là **monolith backend duy nhất** (không tách domain thành microservices độc lập).
 
@@ -568,13 +1155,13 @@ jobs:
 
 ### 9.1 Target Metrics
 
-| Metric | Target | Monitoring |
-|--------|--------|-----------|
-| API Response Time | < 200ms (p95) | Datadog |
-| Sync Time (first load) | < 5s | APM |
-| POI Load (map) | < 100ms | Client-side |
-| Audio Download | < 30s (5MB over 4G) | Analytics |
-| Uptime | 99.9% | Status page |
+| Metric                 | Target              | Monitoring  |
+| ---------------------- | ------------------- | ----------- |
+| API Response Time      | < 200ms (p95)       | Datadog     |
+| Sync Time (first load) | < 5s                | APM         |
+| POI Load (map)         | < 100ms             | Client-side |
+| Audio Download         | < 30s (5MB over 4G) | Analytics   |
+| Uptime                 | 99.9%               | Status page |
 
 ### 9.2 Monitoring
 

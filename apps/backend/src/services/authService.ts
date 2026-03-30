@@ -53,7 +53,7 @@ const DEFAULT_CLAIM_CODES = ['ABC123', 'FOODIE2026', 'LINHUNGVIP'];
 const TOKEN_TTL_SECONDS = Number(process.env.AUTH_TOKEN_TTL_SECONDS ?? 24 * 60 * 60);
 
 const TOKEN_SECRET = process.env.AUTH_JWT_SECRET ?? 'dev-only-auth-secret-change-me';
-const TOKEN_SECRETS = process.env.AUTH_JWT_SECRETS 
+const TOKEN_SECRETS = process.env.AUTH_JWT_SECRETS
   ? process.env.AUTH_JWT_SECRETS.split(',').map(s => s.trim()).filter(Boolean)
   : [TOKEN_SECRET];
 const CURRENT_KID = process.env.AUTH_JWT_KID ?? '1';
@@ -71,9 +71,9 @@ function signJwt(payload: Record<string, unknown>): string {
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const data = `${encodedHeader}.${encodedPayload}`;
-  
+
   const activeSecret = TOKEN_SECRETS[0] ?? TOKEN_SECRET;
-  
+
   const signature = crypto
     .createHmac('sha256', activeSecret)
     .update(data)
@@ -308,6 +308,8 @@ export async function finalizePayment(input: PaymentFinalizeInput): Promise<Paym
       data: {
         idempotencyKey: input.idempotencyKey,
         transactionId: payment.transactionId,
+        provider: payment.provider,
+        callbackData: {},
         signatureHash: input.signatureHash,
         status: mappedStatus
       }

@@ -30,7 +30,7 @@
 | `SPEC_CANONICAL.md` | Single Source of Truth kỹ thuật (invariants, state machine, single voice rule) | AI + Dev | ★★★★★ |
 | `AI_GUIDELINES.md` | Invariants bắt buộc cho AI codegen (Cấm Geofence/Auto-play) | AI Agents | ★★★★★ |
 | `ARCHITECTURE.md` | Technical blueprint & stack | Dev + Architect | ★★★★ |
-| `docs/backend_design.md` | API contract, sync contract, TTS pipeline, i18n backend | Dev + Architect | ★★★★ |
+| `docs/backend_design.md` | API contract (auth/sync/public/analytics/admin), JSON response matrix, sync contract, TTS pipeline, i18n backend | Dev + Architect | ★★★★ |
 | `docs/database_design.md` | PostgreSQL schema + SQLite mirror + indexing | Dev + Architect | ★★★★ |
 | `USE_CASES.md` | Luồng nghiệp vụ chi tiết UC1-UC8 | AI + Dev + QA | ★★★★ |
 | `docs/test_scenarios.md` | Bộ test cases chuẩn hóa theo UC và quality gates | Dev + QA | ★★★★ |

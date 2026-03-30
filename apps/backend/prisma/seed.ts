@@ -7,8 +7,43 @@ const prisma = new PrismaClient();
 
 async function main() {
   const dataset = buildSeedDataset(1, Date.now());
+  const poiIds = dataset.pois.map((poi) => poi.id);
+  const tourIds = dataset.tours.map((tour) => tour.id);
 
   await prisma.$transaction(async (tx) => {
+    await tx.analyticsEvent.deleteMany({
+      where: {
+        OR: [
+          {
+            poiId: {
+              notIn: poiIds,
+            },
+          },
+          {
+            sessionId: {
+              startsWith: "seed-session-",
+            },
+          },
+        ],
+      },
+    });
+
+    await tx.tour.deleteMany({
+      where: {
+        id: {
+          notIn: tourIds,
+        },
+      },
+    });
+
+    await tx.pointOfInterest.deleteMany({
+      where: {
+        id: {
+          notIn: poiIds,
+        },
+      },
+    });
+
     for (const poi of dataset.pois) {
       await tx.pointOfInterest.upsert({
         where: { id: poi.id },
@@ -58,14 +93,6 @@ async function main() {
         },
       });
     }
-
-    await tx.analyticsEvent.deleteMany({
-      where: {
-        sessionId: {
-          startsWith: "seed-session-",
-        },
-      },
-    });
 
     await tx.analyticsEvent.createMany({
       data: dataset.analyticsEvents,

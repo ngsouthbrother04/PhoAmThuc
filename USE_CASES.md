@@ -64,6 +64,7 @@ Visitor accesses the mobile application after providing authorization (either vi
 | 5 | | Downloads POI data + audio files | Atomic write to SQLite + expo-file-system |
 | 6 | | Displays map with all POI markers | Shows cached data ready for exploration |
 | 7 | User sees map screen | System ready for exploration | Auth state: AUTHORIZED |
+| 8 | User continues session over time | Refreshes token or logout when needed | POST `/api/v1/auth/token-refresh`, POST `/api/v1/auth/logout` |
 
 ---
 
@@ -95,6 +96,11 @@ Visitor accesses the mobile application after providing authorization (either vi
 - Sync fails mid-process
 - System retries sync automatically on next launch
 - User can manually trigger "Sync Now" button
+
+**A5: Token Expired During Active Session**
+- API returns 401 due to expired access token
+- Client calls POST `/api/v1/auth/token-refresh`
+- If refresh fails, client clears session and calls POST `/api/v1/auth/logout`
 
 ---
 
@@ -602,7 +608,7 @@ User can explore map, view POI details, and listen to narrations even without in
 ### Postconditions
 - User successfully explored offline
 - Analytics events buffered locally (will sync when online)
-- When internet returns, app syncs analytics & checks for updates
+- When internet returns, app syncs analytics and checks updates using manifest -> incremental sync -> full sync fallback
 
 ---
 
@@ -612,6 +618,11 @@ User can explore map, view POI details, and listen to narrations even without in
 - Sync request queued / deferred
 - Does not fail hard (graceful degradation)
 - Syncs automatically when connection restored
+
+**A3: Incremental Sync Not Applicable**
+- Client reconnects and sends incremental sync request
+- Server responds delta window exceeded / requires full sync
+- Client falls back to GET full sync and applies atomic replace
 
 **A2: Storage Full (SQLite or MP3 cache)**
 - Show warning about storage

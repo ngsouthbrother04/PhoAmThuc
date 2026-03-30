@@ -41,6 +41,18 @@ enum PaymentStatus {
   EXPIRED
 }
 
+enum SyncEntityType {
+  POI
+  TOUR
+}
+
+enum SyncAction {
+  UPSERT
+  DELETE
+  PUBLISH
+  UNPUBLISH
+}
+
 model PointOfInterest {
   id              String           @id @default(uuid())
   name            Json // { "vi": "...", "en": "..." }
@@ -50,6 +62,9 @@ model PointOfInterest {
   longitude       Decimal          @db.Decimal(9, 6)
   type            PoiType
   image           String?
+  isPublished     Boolean          @default(false) @map("is_published")
+  publishedAt     DateTime?        @map("published_at")
+  deletedAt       DateTime?        @map("deleted_at")
   contentVersion  Int              @default(1) @map("content_version")
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
@@ -61,15 +76,18 @@ model PointOfInterest {
 }
 
 model Tour {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   name           Json
   description    Json
-  duration       Int      @default(0) @map("estimated_time")
-  poiIds         Json     @map("poi_ids")
+  duration       Int       @default(0) @map("estimated_time")
+  poiIds         Json      @map("poi_ids")
   image          String?
-  contentVersion Int      @default(1) @map("content_version")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  isPublished    Boolean   @default(false) @map("is_published")
+  publishedAt    DateTime? @map("published_at")
+  deletedAt      DateTime? @map("deleted_at")
+  contentVersion Int       @default(1) @map("content_version")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   @@index([contentVersion], map: "idx_tours_content_version")
   @@map("tours")
@@ -85,6 +103,8 @@ model AnalyticsEvent {
   language   String?
   timestamp  BigInt
   uploaded   Boolean          @default(false)
+  uploadedAt DateTime?        @map("uploaded_at")
+  deviceInfo Json?            @map("device_info")
   createdAt  DateTime         @default(now()) @map("created_at")
   poi        PointOfInterest? @relation(fields: [poiId], references: [id], onDelete: SetNull)
 
@@ -96,46 +116,148 @@ model AnalyticsEvent {
 }
 
 model ClaimCode {
-  id        String   @id @default(uuid())
-  code      String   @unique
-  isUsed    Boolean  @default(false) @map("is_used")
-  usedAt    DateTime? @map("used_at")
-  usedBy    String?  @map("used_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          String    @id @default(uuid())
+  code        String    @unique
+  codeType    String    @default("STANDARD") @map("code_type")
+  isActive    Boolean   @default(true) @map("is_active")
+  expiresAt   DateTime? @map("expires_at")
+  maxUses     Int?      @map("max_uses")
+  currentUses Int       @default(0) @map("current_uses")
+  metadata    Json?
+  createdBy   String?   @map("created_by")
+  isUsed      Boolean   @default(false) @map("is_used")
+  usedAt      DateTime? @map("used_at")
+  usedBy      String?   @map("used_by")
+  users       User[]
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@index([isUsed], map: "idx_claim_codes_is_used")
+  @@index([isActive], map: "idx_claim_codes_is_active")
+  @@index([expiresAt], map: "idx_claim_codes_expires_at")
   @@map("claim_codes")
 }
 
 model PaymentTransaction {
-  id            String          @id @default(uuid())
-  transactionId String          @unique @map("transaction_id")
-  provider      PaymentProvider
-  amount        Int
-  currency      String          @default("VND")
-  status        PaymentStatus   @default(PENDING)
-  returnUrl     String?         @map("return_url")
-  paymentUrl    String          @map("payment_url")
-  expiresAt     DateTime        @map("expires_at")
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
-  callbackEvents PaymentCallbackEvent[]
+  id                    String                 @id @default(uuid())
+  userId                String?                @map("user_id")
+  transactionId         String                 @unique @map("transaction_id")
+  provider              PaymentProvider
+  providerTransactionId String?                @map("provider_transaction_id")
+  amount                Int
+  currency              String                 @default("VND")
+  status                PaymentStatus          @default(PENDING)
+  metadata              Json?
+  returnUrl             String?                @map("return_url")
+  paymentUrl            String                 @map("payment_url")
+  expiresAt             DateTime               @map("expires_at")
+  completedAt           DateTime?              @map("completed_at")
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+  user                  User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  callbackEvents        PaymentCallbackEvent[]
 
   @@index([status], map: "idx_payment_transactions_status")
   @@index([createdAt], map: "idx_payment_transactions_created_at")
+  @@index([userId], map: "idx_payment_transactions_user_id")
+  @@index([providerTransactionId], map: "idx_payment_transactions_provider_transaction_id")
   @@map("payment_transactions")
 }
 
 model PaymentCallbackEvent {
-  id            String             @id @default(uuid())
-  idempotencyKey String            @unique @map("idempotency_key")
-  transactionId String             @map("transaction_id")
-  signatureHash String             @map("signature_hash")
-  status        PaymentStatus
-  createdAt     DateTime           @default(now()) @map("created_at")
-  payment       PaymentTransaction @relation(fields: [transactionId], references: [transactionId], onDelete: Cascade)
+  id             String             @id @default(uuid())
+  idempotencyKey String             @unique @map("idempotency_key")
+  transactionId  String             @map("transaction_id")
+  provider       PaymentProvider
+  callbackData   Json               @default("{}") @map("callback_data")
+  signatureHash  String             @map("signature_hash")
+  status         PaymentStatus
+  processed      Boolean            @default(true)
+  errorMessage   String?            @map("error_message")
+  processedAt    DateTime?          @map("processed_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  payment        PaymentTransaction @relation(fields: [transactionId], references: [transactionId], onDelete: Cascade)
 
   @@index([transactionId], map: "idx_payment_callback_events_transaction_id")
+  @@index([processed], map: "idx_payment_callback_events_processed")
   @@map("payment_callback_events")
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  deviceId            String               @unique @map("device_id")
+  sessionId           String?              @map("session_id")
+  claimCodeId         String?              @map("claim_code_id")
+  preferredLanguage   String               @default("vi") @map("preferred_language")
+  isActive            Boolean              @default(true) @map("is_active")
+  lastSyncAt          DateTime?            @map("last_sync_at")
+  lastSeenAt          DateTime?            @map("last_seen_at")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  claimCode           ClaimCode?           @relation(fields: [claimCodeId], references: [id], onDelete: SetNull)
+  paymentTransactions PaymentTransaction[]
+  authSessions        AuthSession[]
+
+  @@index([claimCodeId], map: "idx_users_claim_code_id")
+  @@index([isActive], map: "idx_users_is_active")
+  @@map("users")
+}
+
+model AuthSession {
+  id               String    @id @default(uuid())
+  userId           String?   @map("user_id")
+  deviceId         String    @map("device_id")
+  refreshTokenHash String    @unique @map("refresh_token_hash")
+  accessTokenJti   String?   @unique @map("access_token_jti")
+  issuedAt         DateTime  @default(now()) @map("issued_at")
+  expiresAt        DateTime  @map("expires_at")
+  revokedAt        DateTime? @map("revoked_at")
+  lastUsedAt       DateTime? @map("last_used_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  user             User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_auth_sessions_user_id")
+  @@index([deviceId], map: "idx_auth_sessions_device_id")
+  @@index([expiresAt], map: "idx_auth_sessions_expires_at")
+  @@map("auth_sessions")
+}
+
+model AppSetting {
+  id                  Int      @id @default(1)
+  currentVersion      Int      @default(1) @map("current_version")
+  dataChecksum        String?  @map("data_checksum")
+  mediaBasePath       String   @default("/audio/") @map("media_base_path")
+  deltaWindowVersions Int      @default(5) @map("delta_window_versions")
+  features            Json     @default("{}")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
+
+model SyncChangeLog {
+  id             BigInt         @id @default(autoincrement())
+  entityType     SyncEntityType @map("entity_type")
+  entityId       String         @map("entity_id")
+  action         SyncAction
+  contentVersion Int            @map("content_version")
+  changedAt      DateTime       @default(now()) @map("changed_at")
+  metadata       Json?          @default("{}")
+
+  @@index([entityType, contentVersion], map: "idx_sync_change_logs_entity_version")
+  @@index([contentVersion], map: "idx_sync_change_logs_version")
+  @@map("sync_change_logs")
+}
+
+model AnalyticsPresence {
+  deviceId        String   @id @map("device_id")
+  sessionId       String   @map("session_id")
+  language        String?
+  lastHeartbeatAt DateTime @map("last_heartbeat_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([lastHeartbeatAt], map: "idx_analytics_presence_last_heartbeat_at")
+  @@map("analytics_presence")
 }

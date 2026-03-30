@@ -3,6 +3,7 @@
 Execution plan derived from canonical documentation.
 
 Source alignment:
+
 - SPEC_CANONICAL.md
 - AI_GUIDELINES.md
 - ARCHITECTURE.md
@@ -12,6 +13,7 @@ Source alignment:
 - docs/test_scenarios.md
 
 Execution tracker:
+
 - EXECUTION_TODO_ISSUES.md
 
 Status: active
@@ -19,14 +21,18 @@ Version: 1.1
 Last updated: 2026-03-25
 
 Progress update (2026-03-26):
+
 - DONE: ISSUE-001, ISSUE-002, ISSUE-003, ISSUE-003B
+- DONE: ISSUE-014, ISSUE-015
 
 Terminology note:
+
 - `AL_GUIDELINES.md` in requests is interpreted as `AI_GUIDELINES.md` in this repository.
 
 ## 1. Scope and Priority
 
 P0 modules (must build first):
+
 1. Auth and Access Gate
 2. Backend TTS Audio Generation
 3. Content Sync and Offline SQLite Mirror
@@ -35,6 +41,7 @@ P0 modules (must build first):
 6. QR Direct Fallback
 
 P1 modules (next):
+
 1. Language and Playback Controls
 2. Tour Mode (Food Routes)
 3. Settings and Re-sync UX
@@ -47,7 +54,8 @@ Workstream C: Mobile Feature UX
 Workstream D: Quality and Release Readiness
 
 Execution mapping:
-- Workstream A -> ISSUE-001, ISSUE-002, ISSUE-003, ISSUE-003B
+
+- Workstream A -> ISSUE-001, ISSUE-002, ISSUE-003, ISSUE-003B, ISSUE-014, ISSUE-015
 - Workstream B -> ISSUE-004, ISSUE-005, ISSUE-006, ISSUE-007, ISSUE-008
 - Workstream C -> ISSUE-009, ISSUE-010, ISSUE-011
 - Workstream D -> ISSUE-012, ISSUE-013
@@ -55,10 +63,11 @@ Execution mapping:
 ## 3. Detailed Task Breakdown
 
 ### Workstream A: Backend API and Data
+
 A1. Boot Backend (Express, Node 20+, Postgres, Local Storage)  
 Linked issue: ISSUE-001
 
-A2. Auth/Payment Endpoints (claim + payment initiate + callback/finalize with validation and error contract)  
+A2. Auth/Payment Endpoints (claim + payment initiate + callback/finalize + token-refresh + logout with validation and error contract)  
 Linked issue: ISSUE-002  
 Acceptance mapping: UC1, TC-1.1 ~ TC-1.5
 
@@ -66,11 +75,12 @@ A3. TTS Generation Integration (server-side queue only; Piper offline; MP3 to Lo
 Linked issue: ISSUE-003  
 Acceptance mapping: ARCHITECTURE.md §3.3, AI_GUIDELINES.md §7
 
-A4. Sync Endpoints (`GET /api/v1/sync/manifest`, `GET /api/v1/sync/full`, checksum/version + `needsSync`)  
+A4. Sync Endpoints (`GET /api/v1/sync/manifest`, `GET /api/v1/sync/full`, `POST /api/v1/sync/incremental`, checksum/version + `needsSync`)  
 Linked issue: ISSUE-003B  
 Acceptance mapping: UC8, TC-8.x, TC-12.x
 
 ### Workstream B: Mobile Core Runtime
+
 B1. App Shell and Navigation Stack  
 Linked issue: ISSUE-004
 
@@ -91,6 +101,7 @@ Linked issue: ISSUE-008
 Acceptance mapping: UC3.A1, UC4.A1, TC-3.2, TC-4.2
 
 ### Workstream C: Mobile Feature UX
+
 C1. QR Scan Flow: Decode -> SQLite lookup -> PLAY_EVENT through the same State Machine.  
 Linked issue: ISSUE-009  
 Acceptance mapping: UC4, TC-4.1 ~ TC-4.4
@@ -108,13 +119,14 @@ Linked issue: ISSUE-011
 Acceptance mapping: UC7, TC-7.x
 
 ### Workstream D: Quality and Release Readiness
+
 D1. Unit tests for state transitions, Single Voice interruption, pause/resume/stop, and store reducer edge cases.  
 Linked issue: ISSUE-012  
 Acceptance mapping: TC-3.2, TC-4.2, TC-6.x
 
-D2. Integration/scenario tests across UC1~UC8 (auth, sync, offline, QR, i18n fallback, analytics buffering/upload).  
+D2. Integration/scenario tests across UC1~UC8 (auth token lifecycle, sync manifest/full/incremental, offline, QR, i18n fallback, public POI/tour APIs, analytics events/heartbeat).  
 Linked issue: ISSUE-013  
-Acceptance mapping: docs/test_scenarios.md
+Acceptance mapping: docs/test_scenarios.md (including TC-18.1 -> TC-18.8)
 
 D3. Performance benchmarking and guardrail validation (tap response, audio start, sync duration, no auto-play regressions).  
 Acceptance mapping: SPEC_CANONICAL.md §6, TC-13.x
@@ -122,6 +134,7 @@ Acceptance mapping: SPEC_CANONICAL.md §6, TC-13.x
 ## 4. Change Management Rule
 
 If any task requires changing semantics:
+
 1. Update SPEC_CANONICAL.md first.
 2. Ensure no Geofence/Auto-play code leaks into the repository.
 3. Ensure no background GPS tracking path is introduced.
