@@ -185,7 +185,10 @@ model PaymentCallbackEvent {
 
 model User {
   id                  String               @id @default(uuid())
-  deviceId            String               @unique @map("device_id")
+  email               String               @unique
+  passwordHash        String               @map("password_hash")
+  fullName            String?              @map("full_name")
+  deviceId            String?              @map("device_id")
   sessionId           String?              @map("session_id")
   claimCodeId         String?              @map("claim_code_id")
   preferredLanguage   String               @default("vi") @map("preferred_language")

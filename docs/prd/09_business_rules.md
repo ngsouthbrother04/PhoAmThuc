@@ -43,3 +43,7 @@ Sync, auth, and content contracts must remain consistent with backend and databa
 ## BR-10 Testing Gate
 
 No feature is considered complete without mapped tests in [test_scenarios.md](../test_scenarios.md).
+
+## BR-11 Freemium Language Restriction
+
+Freemium accounts (users who have signed up but not paid) are restricted to English and Vietnamese. Multi-language access (15 languages) is only available to Premium accounts (users who have completed payment or redeemed a valid claim code).

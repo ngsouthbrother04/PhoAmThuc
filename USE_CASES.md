@@ -35,8 +35,7 @@
 **Maturity**: Focused  
 **Priority**: Critical  
 
-### Summary
-Visitor accesses the mobile application after providing authorization (either via payment or claim code), and system syncs offline content to mobile device.
+Visitor accesses the mobile application after authenticating via email and password (Log In or Sign Up), and the system syncs offline content to the mobile device.
 
 ---
 
@@ -52,19 +51,18 @@ Visitor accesses the mobile application after providing authorization (either vi
 | Step | Actor | System | Technical Realization |
 |------|-------|--------|----------------------|
 | 1 | Opens Phố Ẩm Thực app | Displays login/auth screen | App starts in unauthenticated state |
-| 2 | Selects authorization method | Shows: (a) Claim code, (b) Payment | UI branch logic |
-| 3a | **Path A: Claim Code** | | |
-| 3a1 | Enters claim code "PHOAMTHUC2026" | System validates code against DB | POST `/api/v1/auth/claim` |
-| 3a2 | | Code is valid & active | Returns JWT token + user session |
-| 3b | **Path B: Payment** | | |
-| 3b1 | Selects payment method (VNPay/Momo) | Opens payment gateway | WebView integration |
-| 3b2 | Completes payment | System receives callback from provider | POST `/api/v1/auth/payment/callback` |
-| 3b3 | | Payment successful | Updates user status → authorized |
+| 2 | Chooses action | Shows: (a) Login, (b) Register | UI branch logic |
+| 3a | **Path A: Register** | | |
+| 3a1 | Enters email, password, name | System creates user account | POST `/api/v1/auth/register` |
+| 3a2 | | Account created | Requires login next |
+| 3b | **Path B: Login** | | |
+| 3b1 | Enters email & password | System validates credentials | POST `/api/v1/auth/login` |
+| 3b2 | | Credentials valid | Returns JWT token + user session |
 | 4 | | **CRITICAL**: Sync offline content | GET `/api/v1/sync/manifest` → GET `/api/v1/sync/full` |
 | 5 | | Downloads POI data + audio files | Atomic write to SQLite + expo-file-system |
 | 6 | | Displays map with all POI markers | Shows cached data ready for exploration |
 | 7 | User sees map screen | System ready for exploration | Auth state: AUTHORIZED |
-| 8 | User continues session over time | Refreshes token or logout when needed | POST `/api/v1/auth/token-refresh`, POST `/api/v1/auth/logout` |
+| 8 | User continues session | Refreshes token or logout when needed | POST `/api/v1/auth/token-refresh`, POST `/api/v1/auth/logout` |
 
 ---
 
@@ -78,19 +76,15 @@ Visitor accesses the mobile application after providing authorization (either vi
 
 ### Alternative Paths
 
-**A1: Claim Code Expired**
-- Code is invalid or expires_at < now()
-- System returns 400 error: "Mã xác thực đã hết hạn"
-- User must retry with new code
+**A1: Invalid Login Credentials**
+- User enters wrong email or password
+- System returns 401 error: "Sai tài khoản hoặc mật khẩu"
+- User must retry with correct credentials
 
-**A2: Claim Code Max Uses Exceeded**
-- Code has reached max_uses limit
-- System returns 400 error: "Mã đã được sử dụng hết số lần quy định"
-
-**A3: Payment Failed**
-- Payment provider returns error (user decline, network issue)
-- System shows error message
-- User can retry payment
+**A2: Email Already Exists (Register)**
+- User registers with an email already in the system
+- System returns 400 error: "Email này đã được sử dụng"
+- User is prompted to login instead
 
 **A4: Network Issue During Sync**
 - Sync fails mid-process
@@ -375,12 +369,13 @@ User accesses Settings screen to change preferred language. When language is cha
 |------|-------|--------|-------------------|
 | 1 | Opens Settings screen | Shows language selector dropdown | UI navigation |
 | 2 | Current language highlighted (e.g., "Tiếng Việt") | Displays all available languages | List: VI, EN, KO, JA, FR, DE, ES, PT, RU, ZH, TH, ID, HI, AR, TR |
-| 3 | Selects new language (e.g., "한국어") | System updates preference state | `zustand` store update + `SecureStore` save |
-| 4 | | Re-queries SQLite with new language | Fetch all POIs filtered by new language |
-| 5 | | Updates map display (names, descriptions) | Re-render POI popup text |
-| 6 | | Downloads new audio URLs if not cached | Check backend local static path for new language MP3s |
-| 7 | User sees all content in Korean | New language active | UI refreshed |
-| 8 | Closes Settings | Returns to map | Map shows Korean text |
+| 3 | Selects new language (e.g., "한국어") | System checks user tier (Freemium vs Premium) | Account tier verification |
+| 4 | | User is Premium: Updates preference state | `zustand` store update + `SecureStore` save |
+| 5 | | Re-queries SQLite with new language | Fetch all POIs filtered by new language |
+| 6 | | Updates map display (names, descriptions) | Re-render POI popup text |
+| 7 | | Downloads new audio URLs if not cached | Check backend local static for MP3s |
+| 8 | User sees all content in new language | New language active | UI refreshed |
+| 9 | Closes Settings | Returns to map | Map shows translated text |
 
 ---
 
@@ -403,6 +398,12 @@ User accesses Settings screen to change preferred language. When language is cha
 **A2: Network Offline, Language Audio Missing**
 - Fallback to Vietnamese or English (cached version)
 - Show note: "Âm thanh tiếng này chưa sẵn sàng offline"
+
+**A3: Freemium User Selects Premium Language**
+- User with Freemium tier selects a language other than Tiếng Việt (VI) or Tiếng Anh (EN).
+- System halts the change and displays an Upgrade Prompt: "Nâng cấp Premium để mở khóa tính năng đa ngôn ngữ."
+- Prompts user to proceed to Payment/Redeem page.
+- Current language remains unchanged (still EN/VI).
 
 ---
 

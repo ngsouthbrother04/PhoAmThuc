@@ -1,6 +1,19 @@
 import crypto from 'crypto';
 import prisma from '../lib/prisma';
 
+const ALLOWED_FREEMIUM_LANGS = ['vi', 'en'];
+
+function stripPremiumLanguages(data: any): any {
+  if (!data || typeof data !== 'object') return data;
+  const filtered: Record<string, any> = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (ALLOWED_FREEMIUM_LANGS.includes(k)) {
+      filtered[k] = v;
+    }
+  }
+  return filtered;
+}
+
 export interface SyncManifestResult {
   contentVersion: number;
   totalPois: number;
@@ -49,7 +62,7 @@ function stableJson(value: unknown): string {
   return `{${entries.map(([key, val]) => `${JSON.stringify(key)}:${stableJson(val)}`).join(',')}}`;
 }
 
-export async function getSyncManifest(): Promise<SyncManifestResult> {
+export async function getSyncManifest(isPremium: boolean = false): Promise<SyncManifestResult> {
   const [settings, pois, tours, poiAggregate, tourAggregate] = await Promise.all([
     prisma.appSetting.findUnique({
       where: { id: 1 },
@@ -110,6 +123,9 @@ export async function getSyncManifest(): Promise<SyncManifestResult> {
 
   const normalizedPois = pois.map((poi) => ({
     ...poi,
+    name: isPremium ? poi.name : stripPremiumLanguages(poi.name),
+    description: isPremium ? poi.description : stripPremiumLanguages(poi.description),
+    audioUrls: isPremium ? poi.audioUrls : stripPremiumLanguages(poi.audioUrls),
     latitude: poi.latitude.toString(),
     longitude: poi.longitude.toString(),
     updatedAt: poi.updatedAt.toISOString()
@@ -117,6 +133,8 @@ export async function getSyncManifest(): Promise<SyncManifestResult> {
 
   const normalizedTours = tours.map((tour) => ({
     ...tour,
+    name: isPremium ? tour.name : stripPremiumLanguages(tour.name),
+    description: isPremium ? tour.description : stripPremiumLanguages(tour.description),
     updatedAt: tour.updatedAt.toISOString()
   }));
 
@@ -139,7 +157,7 @@ export async function getSyncManifest(): Promise<SyncManifestResult> {
   };
 }
 
-export async function getSyncFull(): Promise<SyncFullResult> {
+export async function getSyncFull(isPremium: boolean = false): Promise<SyncFullResult> {
   const [settings, pois, tours, poiAggregate, tourAggregate] = await Promise.all([
     prisma.appSetting.findUnique({
       where: { id: 1 },
@@ -192,9 +210,9 @@ export async function getSyncFull(): Promise<SyncFullResult> {
     contentVersion,
     pois: pois.map((poi) => ({
       id: poi.id,
-      name: poi.name,
-      description: poi.description,
-      audioUrls: poi.audioUrls,
+      name: isPremium ? poi.name : stripPremiumLanguages(poi.name),
+      description: isPremium ? poi.description : stripPremiumLanguages(poi.description),
+      audioUrls: isPremium ? poi.audioUrls : stripPremiumLanguages(poi.audioUrls),
       latitude: Number(poi.latitude),
       longitude: Number(poi.longitude),
       type: poi.type,
@@ -202,8 +220,8 @@ export async function getSyncFull(): Promise<SyncFullResult> {
     })),
     tours: tours.map((tour) => ({
       id: tour.id,
-      name: tour.name,
-      description: tour.description,
+      name: isPremium ? tour.name : stripPremiumLanguages(tour.name),
+      description: isPremium ? tour.description : stripPremiumLanguages(tour.description),
       duration: tour.duration,
       poiIds: tour.poiIds,
       image: tour.image,

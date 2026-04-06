@@ -2,13 +2,16 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import { PaymentProvider } from '../../generated/prisma/client';
 import {
-  claimAccess,
+  registerUser,
+  loginUser,
+  redeemClaimCode,
   finalizePayment,
   initiatePayment,
   refreshAuthSession,
   revokeAuthSessionByAccessToken
 } from '../../services/authService';
 import { verifyVNPaySignature, verifyMoMoSignature } from '../../utils/paymentVerifier';
+import { requireAuth, AuthRequest } from '../../middlewares/authMiddleware';
 import asyncHandler from '../../utils/asyncHandler';
 import ApiError from '../../utils/ApiError';
 
@@ -47,26 +50,50 @@ function verifyCallbackSignature(params: {
 }
 
 router.post(
-  '/claim',
+  '/register',
   asyncHandler(async (req, res) => {
-  const claimCodeRaw =
-    typeof req.body?.code === 'string'
-      ? req.body.code
-      : typeof req.body?.claimCode === 'string'
-        ? req.body.claimCode
-        : '';
-  const deviceId = typeof req.body?.deviceId === 'string' ? req.body.deviceId : undefined;
+    const { email, password, fullName, deviceId } = req.body;
+    if (!email || !password) {
+      throw new ApiError(400, 'Thiếu email hoặc password.');
+    }
+    const authData = await registerUser({ email, password, fullName, deviceId });
+    return res.status(201).json({
+      message: 'Đăng ký thành công.',
+      ...authData
+    });
+  })
+);
 
-  if (!claimCodeRaw) {
-    throw new ApiError(400, 'Thiếu code hoặc claimCode.');
-  }
+router.post(
+  '/login',
+  asyncHandler(async (req, res) => {
+    const { email, password, deviceId } = req.body;
+    if (!email || !password) {
+      throw new ApiError(400, 'Thiếu email hoặc password.');
+    }
+    const authData = await loginUser({ email, password, deviceId });
+    return res.status(200).json({
+      message: 'Đăng nhập thành công.',
+      ...authData
+    });
+  })
+);
 
-  const authData = await claimAccess(claimCodeRaw, deviceId);
-  return res.status(200).json({
-    message: 'Xác thực thành công.',
-    ...authData
-  });
-})
+router.post(
+  '/payment/claim',
+  requireAuth,
+  asyncHandler(async (req: AuthRequest, res) => {
+    const claimCodeRaw = req.body?.code || req.body?.claimCode || '';
+    if (!claimCodeRaw) {
+      throw new ApiError(400, 'Thiếu code.');
+    }
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new ApiError(401, 'Unauthorized');
+    }
+    const result = await redeemClaimCode(userId, claimCodeRaw);
+    return res.status(200).json(result);
+  })
 );
 
 router.post(
@@ -92,42 +119,49 @@ router.post(
 
 router.post(
   '/payment/initiate',
-  asyncHandler(async (req, res) => {
-  const providerRaw =
-    typeof req.body?.paymentMethod === 'string'
-      ? req.body.paymentMethod.toLowerCase()
-      : typeof req.body?.provider === 'string'
-        ? req.body.provider.toLowerCase()
-        : '';
-  const amount = Number(req.body?.amount);
-  const currency = typeof req.body?.currency === 'string' ? req.body.currency : 'VND';
-  const deviceId = typeof req.body?.deviceId === 'string' ? req.body.deviceId : undefined;
-  const returnUrl = typeof req.body?.returnUrl === 'string' ? req.body.returnUrl : undefined;
+  requireAuth,
+  asyncHandler(async (req: AuthRequest, res) => {
+    const providerRaw =
+      typeof req.body?.paymentMethod === 'string'
+        ? req.body.paymentMethod.toLowerCase()
+        : typeof req.body?.provider === 'string'
+          ? req.body.provider.toLowerCase()
+          : '';
+    const amount = Number(req.body?.amount);
+    const currency = typeof req.body?.currency === 'string' ? req.body.currency : 'VND';
+    const deviceId = typeof req.body?.deviceId === 'string' ? req.body.deviceId : undefined;
+    const returnUrl = typeof req.body?.returnUrl === 'string' ? req.body.returnUrl : undefined;
 
-  const provider =
-    providerRaw === 'vnpay'
-      ? PaymentProvider.VNPAY
-      : providerRaw === 'momo'
-        ? PaymentProvider.MOMO
-        : undefined;
+    const provider =
+      providerRaw === 'vnpay'
+        ? PaymentProvider.VNPAY
+        : providerRaw === 'momo'
+          ? PaymentProvider.MOMO
+          : undefined;
 
-  if (!provider) {
-    throw new ApiError(400, 'provider phải là vnpay hoặc momo.');
-  }
+    if (!provider) {
+      throw new ApiError(400, 'provider phải là vnpay hoặc momo.');
+    }
 
-  const payment = await initiatePayment({
-    provider,
-    amount,
-    currency,
-    deviceId,
-    returnUrl
-  });
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new ApiError(401, 'Unauthorized');
+    }
 
-  return res.status(200).json({
-    message: 'Khởi tạo thanh toán thành công.',
-    ...payment
-  });
-})
+    const payment = await initiatePayment({
+      provider,
+      amount,
+      currency,
+      deviceId,
+      returnUrl,
+      userId
+    });
+
+    return res.status(200).json({
+      message: 'Khởi tạo thanh toán thành công.',
+      ...payment
+    });
+  })
 );
 
 router.post(
@@ -153,103 +187,103 @@ router.post(
 router.post(
   '/payment/callback',
   asyncHandler(async (req, res) => {
-  const transactionIdRaw =
-    typeof req.body?.orderId === 'string'
-      ? req.body.orderId
-      : typeof req.body?.transactionId === 'string'
-        ? req.body.transactionId
-        : '';
-  const statusRaw = typeof req.body?.status === 'string' ? req.body.status.toLowerCase() : '';
-  const deviceId = typeof req.body?.deviceId === 'string' ? req.body.deviceId : undefined;
-  const idempotencyKeyHeader = req.headers['x-idempotency-key'];
-  const signatureHeader = req.headers['x-callback-signature'];
-  const timestampHeader = req.headers['x-callback-timestamp'];
+    const transactionIdRaw =
+      typeof req.body?.orderId === 'string'
+        ? req.body.orderId
+        : typeof req.body?.transactionId === 'string'
+          ? req.body.transactionId
+          : '';
+    const statusRaw = typeof req.body?.status === 'string' ? req.body.status.toLowerCase() : '';
+    const deviceId = typeof req.body?.deviceId === 'string' ? req.body.deviceId : undefined;
+    const idempotencyKeyHeader = req.headers['x-idempotency-key'];
+    const signatureHeader = req.headers['x-callback-signature'];
+    const timestampHeader = req.headers['x-callback-timestamp'];
 
-  const idempotencyKey = typeof idempotencyKeyHeader === 'string' ? idempotencyKeyHeader : '';
-  const signature = typeof signatureHeader === 'string' ? signatureHeader : '';
-  const timestamp = typeof timestampHeader === 'string' ? timestampHeader : '';
+    const idempotencyKey = typeof idempotencyKeyHeader === 'string' ? idempotencyKeyHeader : '';
+    const signature = typeof signatureHeader === 'string' ? signatureHeader : '';
+    const timestamp = typeof timestampHeader === 'string' ? timestampHeader : '';
 
-  const providerRaw = typeof req.body?.provider === 'string' ? req.body.provider.toLowerCase() : '';
-  const gatewayPayload = typeof req.body?.gatewayPayload === 'object' && req.body.gatewayPayload !== null ? req.body.gatewayPayload : undefined;
+    const providerRaw = typeof req.body?.provider === 'string' ? req.body.provider.toLowerCase() : '';
+    const gatewayPayload = typeof req.body?.gatewayPayload === 'object' && req.body.gatewayPayload !== null ? req.body.gatewayPayload : undefined;
 
-  const status =
-    statusRaw === 'success' || statusRaw === 'succeeded'
-      ? 'success'
-      : statusRaw === 'failed' || statusRaw === 'fail'
-        ? 'failed'
-        : statusRaw === 'cancelled' || statusRaw === 'canceled'
-          ? 'cancelled'
-          : undefined;
+    const status =
+      statusRaw === 'success' || statusRaw === 'succeeded'
+        ? 'success'
+        : statusRaw === 'failed' || statusRaw === 'fail'
+          ? 'failed'
+          : statusRaw === 'cancelled' || statusRaw === 'canceled'
+            ? 'cancelled'
+            : undefined;
 
-  if (!transactionIdRaw || !status) {
-    throw new ApiError(400, 'Thiếu transactionId/orderId hoặc status không hợp lệ.');
-  }
-
-  if (!idempotencyKey) {
-    throw new ApiError(400, 'Thiếu x-idempotency-key.');
-  }
-
-  let validSignature = false;
-  let signatureHashToSave = signature;
-
-  if (providerRaw === 'vnpay' && gatewayPayload) {
-    validSignature = verifyVNPaySignature(gatewayPayload as Record<string, string>);
-    signatureHashToSave = (gatewayPayload as Record<string, string>)['vnp_SecureHash'] || 'vnpay-validated';
-  } else if (providerRaw === 'momo' && gatewayPayload) {
-    validSignature = verifyMoMoSignature(gatewayPayload as Record<string, string>);
-    signatureHashToSave = (gatewayPayload as Record<string, string>)['signature'] || 'momo-validated';
-  } else {
-    if (!signature || !timestamp) {
-      throw new ApiError(400, 'Thiếu xác thực (gatewayPayload hoặc x-callback-signature/timestamp).');
+    if (!transactionIdRaw || !status) {
+      throw new ApiError(400, 'Thiếu transactionId/orderId hoặc status không hợp lệ.');
     }
 
-    const callbackTimestampMs = Number(timestamp);
-    if (!Number.isFinite(callbackTimestampMs)) {
-      throw new ApiError(400, 'x-callback-timestamp không hợp lệ.');
+    if (!idempotencyKey) {
+      throw new ApiError(400, 'Thiếu x-idempotency-key.');
     }
 
-    const nowMs = Date.now();
-    if (Math.abs(nowMs - callbackTimestampMs) > CALLBACK_TTL_SECONDS * 1000) {
-      throw new ApiError(401, 'Callback đã quá hạn hoặc lệch thời gian cho phép.');
+    let validSignature = false;
+    let signatureHashToSave = signature;
+
+    if (providerRaw === 'vnpay' && gatewayPayload) {
+      validSignature = verifyVNPaySignature(gatewayPayload as Record<string, string>);
+      signatureHashToSave = (gatewayPayload as Record<string, string>)['vnp_SecureHash'] || 'vnpay-validated';
+    } else if (providerRaw === 'momo' && gatewayPayload) {
+      validSignature = verifyMoMoSignature(gatewayPayload as Record<string, string>);
+      signatureHashToSave = (gatewayPayload as Record<string, string>)['signature'] || 'momo-validated';
+    } else {
+      if (!signature || !timestamp) {
+        throw new ApiError(400, 'Thiếu xác thực (gatewayPayload hoặc x-callback-signature/timestamp).');
+      }
+
+      const callbackTimestampMs = Number(timestamp);
+      if (!Number.isFinite(callbackTimestampMs)) {
+        throw new ApiError(400, 'x-callback-timestamp không hợp lệ.');
+      }
+
+      const nowMs = Date.now();
+      if (Math.abs(nowMs - callbackTimestampMs) > CALLBACK_TTL_SECONDS * 1000) {
+        throw new ApiError(401, 'Callback đã quá hạn hoặc lệch thời gian cho phép.');
+      }
+
+      validSignature = verifyCallbackSignature({
+        transactionId: transactionIdRaw,
+        status,
+        deviceId,
+        timestamp,
+        signature
+      });
     }
 
-    validSignature = verifyCallbackSignature({
+    if (!validSignature) {
+      throw new ApiError(401, 'Chữ ký callback (gateway hoặc internal) không hợp lệ.');
+    }
+
+    const finalized = await finalizePayment({
       transactionId: transactionIdRaw,
       status,
-      deviceId,
-      timestamp,
-      signature
+      idempotencyKey,
+      signatureHash: signatureHashToSave,
+      deviceId
     });
-  }
 
-  if (!validSignature) {
-    throw new ApiError(401, 'Chữ ký callback (gateway hoặc internal) không hợp lệ.');
-  }
+    if (finalized.status === 'SUCCEEDED') {
+      return res.status(200).json({
+        token: finalized.token,
+        expiresIn: finalized.expiresIn,
+        deviceId: finalized.deviceId,
+        orderId: finalized.orderId,
+        status: finalized.status
+      });
+    }
 
-  const finalized = await finalizePayment({
-    transactionId: transactionIdRaw,
-    status,
-    idempotencyKey,
-    signatureHash: signatureHashToSave,
-    deviceId
-  });
-
-  if (finalized.status === 'SUCCEEDED') {
     return res.status(200).json({
-      token: finalized.token,
-      expiresIn: finalized.expiresIn,
-      deviceId: finalized.deviceId,
       orderId: finalized.orderId,
-      status: finalized.status
+      status: finalized.status,
+      deviceId: finalized.deviceId
     });
-  }
-
-  return res.status(200).json({
-    orderId: finalized.orderId,
-    status: finalized.status,
-    deviceId: finalized.deviceId
-  });
-})
+  })
 );
 
 export default router;

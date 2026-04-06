@@ -13,12 +13,13 @@
 
 ## 2. Authentication and Access
 
-1. POST /api/v1/auth/claim.
-2. POST /api/v1/auth/payment/initiate.
-3. POST /api/v1/auth/payment/callback.
-4. POST /api/v1/auth/token-refresh for token lifecycle management (input body: refreshToken).
-5. POST /api/v1/auth/logout to invalidate current access token on server runtime and clear client session.
-6. Error contracts use structured error object with stable code and message.
+1. POST /api/v1/auth/register for creating a new account (Email/Password).
+2. POST /api/v1/auth/login for obtaining initial access token.
+3. POST /api/v1/auth/token-refresh for token lifecycle management (input body: refreshToken).
+4. POST /api/v1/auth/logout to invalidate current access token on server runtime and clear client session.
+5. POST /api/v1/payment/initiate to start transaction (requires auth).
+6. POST /api/v1/payment/claim to redeem access code (requires auth).
+7. Error contracts use structured error object with stable code and message.
 
 ## 3. Sync Contract
 

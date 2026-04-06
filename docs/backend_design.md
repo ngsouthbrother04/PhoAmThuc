@@ -81,18 +81,20 @@ Language selection (canonical): query param `?language=vi`
 
 | Endpoint                 | Method | Mục đích                           | Auth |
 | ------------------------ | ------ | ---------------------------------- | ---- |
-| `/auth/claim`            | POST   | Xác thực mã claim/voucher          | ❌   |
-| `/auth/payment/initiate` | POST   | Khởi tạo thanh toán                | ❌   |
-| `/auth/payment/callback` | POST   | Xử lý callback/finalize thanh toán | ❌   |
+| `/auth/register`         | POST   | Đăng ký tài khoản mới              | ❌   |
+| `/auth/login`            | POST   | Đăng nhập (Email/Password)         | ❌   |
 | `/auth/token-refresh`    | POST   | Làm mới JWT Token                  | ❌   |
 | `/auth/logout`           | POST   | Đăng xuất                          | ✅   |
+| `/payment/initiate`      | POST   | Mua quyền truy cập (Sau đăng nhập) | ✅   |
+| `/payment/claim`         | POST   | Nhập mã voucher (Sau đăng nhập)    | ✅   |
 
 **Request/Response ví dụ**:
 
 ```json
-// POST /auth/claim
+// POST /auth/login
 {
-  "code": "PHOAMTHUC2026"
+  "email": "user@example.com",
+  "password": "securepassword123"
 }
 
 // Response 200
@@ -102,7 +104,7 @@ Language selection (canonical): query param `?language=vi`
   "expiresIn": 86400,
   "user": {
     "id": "user_123",
-    "claimCode": "PHOAMTHUC2026",
+    "email": "user@example.com",
     "createdAt": "2026-03-25T10:00:00Z"
   }
 }
@@ -318,33 +320,49 @@ Mục này chuẩn hoa mau response cho tung endpoint theo cac truong hop pho bi
 
 #### A. Authentication & Authorization
 
-**POST `/auth/claim`**
+**POST `/auth/register`**
 
 ```json
-// 200 - Claim code hop le
+// Request
 {
-  "status": "success",
-  "authToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expiresIn": 86400,
-  "user": {
-    "id": "user_123",
-    "deviceId": "device_xyz",
-    "claimCode": "PHOAMTHUC2026"
-  }
+  "email": "user@example.com",
+  "password": "password123",
+  "fullName": "Nguyen Van A"
 }
 
-// 400 - Claim code khong hop le/het han
+// 200 - Dang ky thanh cong
 {
-  "status": "error",
-  "error": {
-    "code": "INVALID_OR_EXPIRED_CLAIM_CODE",
-    "message": "Ma xac thuc khong hop le hoac da het han",
-    "timestamp": "2026-03-30T10:00:00Z"
+  "status": "success",
+  "data": {
+    "id": "user_123",
+    "email": "user@example.com"
   }
 }
 ```
 
-**POST `/auth/payment/initiate`**
+**POST `/auth/login`**
+
+```json
+// Request
+{
+  "email": "user@example.com",
+  "password": "password123"
+}
+
+// 200 - Dang nhap thanh cong
+{
+  "status": "success",
+  "authToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJ...",
+  "expiresIn": 86400,
+  "user": {
+    "id": "user_123",
+    "email": "user@example.com"
+  }
+}
+```
+
+**POST `/payment/initiate`**
 
 ```json
 // 200 - Khoi tao thanh toan thanh cong
@@ -369,7 +387,7 @@ Mục này chuẩn hoa mau response cho tung endpoint theo cac truong hop pho bi
 }
 ```
 
-**POST `/auth/payment/callback`**
+**POST `/payment/callback`**
 
 ```json
 // 200 - Callback hop le, giao dich thanh cong

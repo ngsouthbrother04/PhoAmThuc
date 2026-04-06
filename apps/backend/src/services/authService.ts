@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import prisma from '../lib/prisma';
 import { PaymentProvider, PaymentStatus } from '../generated/prisma/client';
 
@@ -20,6 +21,7 @@ export interface PaymentInitiateInput {
   currency?: string;
   deviceId?: string;
   returnUrl?: string;
+  userId: string;
 }
 
 export interface PaymentInitiateResult {
@@ -237,7 +239,60 @@ async function seedDefaultClaimCodes(): Promise<void> {
   });
 }
 
-export async function claimAccess(claimCode: string, deviceId?: string): Promise<ClaimAuthResult> {
+export async function registerUser(input: any): Promise<ClaimAuthResult> {
+  const { email, password, fullName, deviceId } = input;
+  
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) {
+    throw new Error('EMAIL_EXISTS');
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  const passwordHash = await bcrypt.hash(password, salt);
+
+  const user = await prisma.user.create({
+    data: {
+      email,
+      passwordHash,
+      fullName,
+      deviceId
+    }
+  });
+
+  return issueAuthPair({
+    subject: user.id,
+    deviceId
+  });
+}
+
+export async function loginUser(input: any): Promise<ClaimAuthResult> {
+  const { email, password, deviceId } = input;
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    throw new Error('INVALID_CREDENTIALS');
+  }
+
+  const isMatch = await bcrypt.compare(password, user.passwordHash);
+  if (!isMatch) {
+    throw new Error('INVALID_CREDENTIALS');
+  }
+
+  if (deviceId && user.deviceId !== deviceId) {
+    // Optionally update the deviceId
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { deviceId }
+    });
+  }
+
+  return issueAuthPair({
+    subject: user.id,
+    deviceId
+  });
+}
+
+export async function redeemClaimCode(userId: string, claimCode: string): Promise<{ success: boolean; message: string }> {
   const normalizedCode = toSafeClaimCode(claimCode);
 
   if (!/^[A-Z0-9_-]{4,32}$/.test(normalizedCode)) {
@@ -254,7 +309,7 @@ export async function claimAccess(claimCode: string, deviceId?: string): Promise
     data: {
       isUsed: true,
       usedAt: new Date(),
-      usedBy: `claimer:${normalizedCode}`
+      usedBy: `user:${userId}`
     }
   });
 
@@ -262,10 +317,14 @@ export async function claimAccess(claimCode: string, deviceId?: string): Promise
     throw new Error('CLAIM_CODE_NOT_FOUND_OR_USED');
   }
 
-  return issueAuthPair({
-    subject: `claimer:${normalizedCode}`,
-    deviceId: deviceId ?? `claimer:${normalizedCode}`
+  const codeRecord = await prisma.claimCode.findUnique({ where: { code: normalizedCode }});
+  
+  await prisma.user.update({
+    where: { id: userId },
+    data: { claimCodeId: codeRecord?.id }
   });
+
+  return { success: true, message: 'Nhập mã thành công. Bạn đã trở thành hội viên Premium.' };
 }
 
 export async function initiatePayment(input: PaymentInitiateInput): Promise<PaymentInitiateResult> {
@@ -286,6 +345,7 @@ export async function initiatePayment(input: PaymentInitiateInput): Promise<Paym
   const created = await prisma.paymentTransaction.create({
     data: {
       transactionId,
+      userId: input.userId,
       provider: input.provider,
       amount: input.amount,
       currency: 'VND',
@@ -332,7 +392,7 @@ export async function finalizePayment(input: PaymentFinalizeInput): Promise<Paym
 
     if (existingPayment.status === 'SUCCEEDED') {
       const pair = await issueAuthPair({
-        subject: `payment:${existingPayment.transactionId}`,
+        subject: existingPayment.userId || `payment:${existingPayment.transactionId}`,
         deviceId: input.deviceId ?? `payment:${existingPayment.transactionId}`
       });
       return {
@@ -401,7 +461,7 @@ export async function finalizePayment(input: PaymentFinalizeInput): Promise<Paym
   }
 
   const issued = await issueAuthPair({
-    subject: `payment:${updated.transactionId}`,
+    subject: updated.userId || `payment:${updated.transactionId}`,
     deviceId: input.deviceId ?? `payment:${updated.transactionId}`
   });
 
@@ -469,4 +529,19 @@ export async function isAccessTokenSessionActive(token: string): Promise<boolean
   } catch {
     return false;
   }
+}
+
+export async function isUserPremium(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      paymentTransactions: {
+        where: { status: 'SUCCEEDED' },
+        take: 1
+      }
+    }
+  });
+  if (!user) return false;
+  return user.claimCodeId !== null || user.paymentTransactions.length > 0;
 }

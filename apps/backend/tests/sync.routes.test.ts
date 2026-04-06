@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import syncRouter from '../src/routes/api/sync';
 import { errorHandlingMiddleware, notFoundMiddleware } from '../src/middlewares/errorHandlingMiddleware';
 import { getSyncFull, getSyncManifest } from '../src/services/syncService';
-import { isAccessTokenSessionActive, verifyJwt } from '../src/services/authService';
+import { isAccessTokenSessionActive, verifyJwt, isUserPremium } from '../src/services/authService';
 
 vi.mock('../src/services/syncService', () => ({
   getSyncManifest: vi.fn(),
@@ -13,7 +13,8 @@ vi.mock('../src/services/syncService', () => ({
 
 vi.mock('../src/services/authService', () => ({
   verifyJwt: vi.fn(),
-  isAccessTokenSessionActive: vi.fn()
+  isAccessTokenSessionActive: vi.fn(),
+  isUserPremium: vi.fn()
 }));
 
 function createApp() {
@@ -30,6 +31,7 @@ describe('SYNC routes', () => {
     vi.clearAllMocks();
     vi.mocked(verifyJwt).mockReturnValue({ sub: 'user-id' });
     vi.mocked(isAccessTokenSessionActive).mockResolvedValue(true);
+    vi.mocked(isUserPremium).mockResolvedValue(false);
   });
 
   it('GET /api/v1/sync/manifest should return manifest payload', async () => {
@@ -43,7 +45,7 @@ describe('SYNC routes', () => {
       checksum: 'sha256-abc'
     });
 
-    const res = await request(app).get('/api/v1/sync/manifest');
+    const res = await request(app).get('/api/v1/sync/manifest').set('Authorization', 'Bearer test-token');
 
     expect(res.status).toBe(200);
     expect(res.body.contentVersion).toBe(5);

@@ -224,8 +224,13 @@ CREATE INDEX idx_tours_content_version ON tours(content_version);
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
+  -- Account info
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  full_name VARCHAR(255),
+  
   -- Device & session info
-  device_id VARCHAR(255) NOT NULL UNIQUE,  -- Device identifier
+  device_id VARCHAR(255),  -- Optional device identifier
   session_id VARCHAR(255),  -- Current session
   
   -- Authorization and links
@@ -632,7 +637,10 @@ Lưu ý: sơ đồ dưới đây là bản rút gọn cho domain chính. Các b�
 │   User                       │
 ├──────────────────────────────┤
 │ id (PK)                      │
-│ device_id (UNIQUE)           │
+│ email (UNIQUE)               │
+│ password_hash                │
+│ full_name                    │
+│ device_id                    │
 │ session_id                   │
 │ claim_code                   │
 │ preferred_language           │
@@ -935,8 +943,8 @@ save 300 10       # Save every 5 min if at least 10 keys changed
 
 ### 10.2 User Data
 
-- ✅ Claim code attached to device_id (not personal info)
-- ✅ No email/phone stored
+- ✅ Claim code attached to user_id
+- ✅ Password explicitly hashed (bcrypt/argon2) to prevent leaks
 - ✅ Soft delete (is_active flag, not hard delete)
 
 ---

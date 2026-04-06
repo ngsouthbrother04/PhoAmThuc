@@ -111,14 +111,24 @@ describeIfDb('SYNC integration with real Prisma', () => {
   it('GET /api/v1/sync/manifest should reflect seeded runtime data', async () => {
     const app = createApp();
 
-    const res = await request(app).get('/api/v1/sync/manifest');
+    const { token } = createAuthToken('integration-test');
+    const deviceId = `sync-integration-manifest-${Date.now()}`;
+    const { sessionId } = await seedActiveSession(token, deviceId);
+
+    try {
+      const res = await request(app)
+        .get('/api/v1/sync/manifest')
+        .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
     expect(res.body.contentVersion).toBeGreaterThanOrEqual(contentVersion);
     expect(res.body.totalPois).toBeGreaterThanOrEqual(dataset.pois.length);
     expect(res.body.totalTours).toBeGreaterThanOrEqual(dataset.tours.length);
     expect(typeof res.body.lastUpdatedAt).toBe('string');
-    expect(res.body.checksum).toMatch(/^sha256-[a-f0-9]{64}$/);
+      expect(res.body.checksum).toMatch(/^sha256-[a-f0-9]{64}$/);
+    } finally {
+      await prisma.authSession.deleteMany({ where: { id: sessionId } });
+    }
   });
 
   it('GET /api/v1/sync/full should include seeded POIs and Tours with correct values', async () => {
@@ -142,9 +152,17 @@ describeIfDb('SYNC integration with real Prisma', () => {
       for (const seededPoi of dataset.pois) {
         const poi = poiById.get(seededPoi.id);
         expect(poi).toBeDefined();
-        expect(poi.name).toEqual(seededPoi.name);
-        expect(poi.description).toEqual(seededPoi.description);
-        expect(poi.audioUrls).toEqual(seededPoi.audioUrls);
+
+        const stripLangs = (obj: any) => {
+          const res: any = {};
+          if (obj.vi) res.vi = obj.vi;
+          if (obj.en) res.en = obj.en;
+          return res;
+        };
+
+        expect(poi.name).toEqual(stripLangs(seededPoi.name));
+        expect(poi.description).toEqual(stripLangs(seededPoi.description));
+        expect(poi.audioUrls).toEqual(stripLangs(seededPoi.audioUrls));
         expect(poi.type).toBe(seededPoi.type);
         expect(poi.image).toBe(seededPoi.image);
         expect(poi.latitude).toBeCloseTo(Number(seededPoi.latitude), 6);
@@ -154,8 +172,16 @@ describeIfDb('SYNC integration with real Prisma', () => {
       for (const seededTour of dataset.tours) {
         const tour = tourById.get(seededTour.id);
         expect(tour).toBeDefined();
-        expect(tour.name).toEqual(seededTour.name);
-        expect(tour.description).toEqual(seededTour.description);
+
+        const stripLangs = (obj: any) => {
+          const res: any = {};
+          if (obj.vi) res.vi = obj.vi;
+          if (obj.en) res.en = obj.en;
+          return res;
+        };
+
+        expect(tour.name).toEqual(stripLangs(seededTour.name));
+        expect(tour.description).toEqual(stripLangs(seededTour.description));
         expect(tour.duration).toBe(seededTour.duration);
         expect(tour.image).toBe(seededTour.image);
         expect(tour.poiIds).toEqual(seededTour.poiIds);
@@ -169,15 +195,17 @@ describeIfDb('SYNC integration with real Prisma', () => {
   it('GET /api/v1/sync/full should short-circuit when client version is current', async () => {
     const app = createApp();
 
-    const manifestRes = await request(app).get('/api/v1/sync/manifest');
-    expect(manifestRes.status).toBe(200);
-
-    const currentVersion = manifestRes.body.contentVersion;
     const { token } = createAuthToken('integration-test');
     const deviceId = `sync-integration-${Date.now()}-current`;
     const { sessionId } = await seedActiveSession(token, deviceId);
 
     try {
+      const manifestRes = await request(app)
+        .get('/api/v1/sync/manifest')
+        .set('Authorization', `Bearer ${token}`);
+      expect(manifestRes.status).toBe(200);
+
+      const currentVersion = manifestRes.body.contentVersion;
       const fullRes = await request(app)
         .get(`/api/v1/sync/full?version=${currentVersion}`)
         .set('Authorization', `Bearer ${token}`);

@@ -40,56 +40,57 @@ Rule: mỗi UC có đúng 1 AC chính và đúng 1 test gate chính để pass/f
 
 ### Scenario 1 – Authorization (UC1)
 
-#### TC-1.1: Valid Claim Code
+#### TC-1.1: Valid Registration (Signup)
 
 | Field               | Value                                                           |
 | ------------------- | --------------------------------------------------------------- |
 | **Test Case ID**    | TC-1.1                                                          |
-| **Title**           | User authorizes with valid claim code                           |
-| **Precondition**    | App installed, no prior auth                                    |
-| **Steps**           | 1. Open app → 2. Select "Claim Code" → 3. Enter "PHOAMTHUC2026" |
-| **Expected Result** | ✅ Auth successful, JWT token stored, sync begins               |
+| **Title**           | User registers a new account successfully                       |
+| **Precondition**    | App installed, no prior auth, unused email                      |
+| **Steps**           | 1. Open app → 2. Select "Sign Up" → 3. Enter details → 4. Submit|
+| **Expected Result** | ✅ Account created, redirected to Login screen                  |
 | **Actual Result**   |                                                                 |
 | **Status**          | ⬜ Not Run                                                      |
 
-#### TC-1.2: Invalid Claim Code
+#### TC-1.2: Valid Login
+
+| Field               | Value                                                           |
+| ------------------- | --------------------------------------------------------------- |
+| **Test Case ID**    | TC-1.2                                                          |
+| **Title**           | User logs in with valid credentials                             |
+| **Precondition**    | User has registered account                                     |
+| **Steps**           | 1. Open app → 2. Select "Log In" → 3. Enter email & pass        |
+| **Expected Result** | ✅ Auth successful, JWT token stored, sync begins               |
+| **Status**          | ⬜ Not Run                                                      |
+
+#### TC-1.3: Invalid Login Credentials
 
 | Field               | Value                                        |
 | ------------------- | -------------------------------------------- |
-| **Test Case ID**    | TC-1.2                                       |
-| **Title**           | User enters invalid claim code               |
-| **Steps**           | 1. Enter "INVALID_CODE"                      |
-| **Expected Result** | ❌ Error message: "Mã xác thực không hợp lệ" |
+| **Test Case ID**    | TC-1.3                                       |
+| **Title**           | User enters wrong email or password          |
+| **Steps**           | 1. Enter valid email, wrong password         |
+| **Expected Result** | ❌ Error message: "Sai tài khoản hoặc mật khẩu"|
 | **Status**          | ⬜ Not Run                                   |
 
-#### TC-1.3: Expired Claim Code
-
-| Field               | Value                         |
-| ------------------- | ----------------------------- |
-| **Test Case ID**    | TC-1.3                        |
-| **Title**           | Claim code expired            |
-| **Precondition**    | Claim code expires_at < now() |
-| **Expected Result** | ❌ Error: "Mã đã hết hạn"     |
-| **Status**          | ⬜ Not Run                    |
-
-#### TC-1.4: Payment Gateway (VNPay)
+#### TC-1.4: Existing Email Registration
 
 | Field               | Value                                                |
 | ------------------- | ---------------------------------------------------- |
 | **Test Case ID**    | TC-1.4                                               |
-| **Title**           | User completes VNPay payment                         |
-| **Steps**           | 1. Select VNPay → 2. Enter payment info → 3. Confirm |
-| **Expected Result** | ✅ Payment callback received, user authorized        |
+| **Title**           | User registers with existing email                   |
+| **Steps**           | 1. Register with email already in DB                 |
+| **Expected Result** | ❌ Error: "Email này đã được sử dụng"                |
 | **Status**          | ⬜ Not Run                                           |
 
-#### TC-1.5: Payment Failure
+#### TC-1.5: Refresh Token Expiry
 
 | Field               | Value                                                  |
 | ------------------- | ------------------------------------------------------ |
 | **Test Case ID**    | TC-1.5                                                 |
-| **Title**           | Payment declined                                       |
-| **Steps**           | 1. Select payment → 2. Enter invalid card → 3. Confirm |
-| **Expected Result** | ❌ Error displayed, retry option                       |
+| **Title**           | Refresh token expired                                  |
+| **Steps**           | 1. Open app with expired refresh token                 |
+| **Expected Result** | ❌ Session cleared, user redirected to Login screen    |
 | **Status**          | ⬜ Not Run                                             |
 
 ---

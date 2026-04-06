@@ -211,9 +211,11 @@ This file defines:
 
 ## 🔐 Authentication & Access
 
-**Two authorization paths**:
-1. **Claim Code** – Offline voucher validation (preferable for MVP)
-2. **Payment Integration** – VNPay / Momo webhook callback
+**Two authentication paths**:
+1. **Sign Up** – Register a new account with Email/Password
+2. **Log In** – Access an existing account
+
+*(Note: Claim codes and payments are handled after successful login)*
 
 **Both paths**: Trigger offline sync → User explores with cached data (no internet required)
 
