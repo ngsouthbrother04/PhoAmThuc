@@ -18,6 +18,21 @@ import ApiError from '../../utils/ApiError';
 const router = Router();
 const CALLBACK_TTL_SECONDS = Number(process.env.PAYMENT_CALLBACK_MAX_AGE_SECONDS ?? 300);
 
+/**
+ * POST /api/v1/auth/register
+ * @summary Register a new account
+ * @description Create a user account using email and password.
+ * @tags Auth
+ * @param {object} request.body.required - Registration payload
+ * @param {string} request.body.email.required - User email
+ * @param {string} request.body.password.required - User password
+ * @param {string} request.body.fullName - Full name
+ * @param {string} request.body.deviceId - Device identifier
+ * @return {object} 201 - Registration successful
+ * @return {object} 400 - Invalid payload
+ * @return {object} 500 - Internal Server Error
+ */
+
 function extractBearerToken(headerValue: unknown): string {
   if (typeof headerValue !== 'string' || !headerValue.startsWith('Bearer ')) {
     return '';
@@ -64,6 +79,21 @@ router.post(
   })
 );
 
+/**
+ * POST /api/v1/auth/login
+ * @summary Login with email and password
+ * @description Authenticate user and return access/refresh tokens.
+ * @tags Auth
+ * @param {object} request.body.required - Login payload
+ * @param {string} request.body.email.required - User email
+ * @param {string} request.body.password.required - User password
+ * @param {string} request.body.deviceId - Device identifier
+ * @return {object} 200 - Login successful
+ * @return {object} 400 - Invalid payload
+ * @return {object} 401 - Unauthorized
+ * @return {object} 500 - Internal Server Error
+ */
+
 router.post(
   '/login',
   asyncHandler(async (req, res) => {
@@ -78,6 +108,21 @@ router.post(
     });
   })
 );
+
+/**
+ * POST /api/v1/auth/payment/claim
+ * @summary Redeem claim code
+ * @description Redeem access code for authenticated user.
+ * @tags Auth
+ * @security bearerAuth
+ * @param {object} request.body.required - Claim payload
+ * @param {string} request.body.code - Claim code
+ * @param {string} request.body.claimCode - Alternative claim code field
+ * @return {object} 200 - Claim successful
+ * @return {object} 400 - Missing code
+ * @return {object} 401 - Unauthorized
+ * @return {object} 500 - Internal Server Error
+ */
 
 router.post(
   '/payment/claim',
@@ -95,6 +140,18 @@ router.post(
     return res.status(200).json(result);
   })
 );
+
+/**
+ * POST /api/v1/auth/token-refresh
+ * @summary Refresh access token
+ * @description Refresh auth session by refresh token in request body.
+ * @tags Auth
+ * @param {object} request.body.required - Refresh payload
+ * @param {string} request.body.refreshToken.required - Refresh token
+ * @return {object} 200 - Token refreshed
+ * @return {object} 401 - Invalid or expired refresh token
+ * @return {object} 500 - Internal Server Error
+ */
 
 router.post(
   '/token-refresh',
@@ -116,6 +173,25 @@ router.post(
     }
   })
 );
+
+/**
+ * POST /api/v1/auth/payment/initiate
+ * @summary Initiate payment transaction
+ * @description Create payment transaction for authenticated user.
+ * @tags Auth
+ * @security bearerAuth
+ * @param {object} request.body.required - Payment init payload
+ * @param {string} request.body.provider - Payment provider (vnpay or momo)
+ * @param {string} request.body.paymentMethod - Alternative provider field
+ * @param {number} request.body.amount.required - Payment amount
+ * @param {string} request.body.currency - Currency code
+ * @param {string} request.body.deviceId - Device identifier
+ * @param {string} request.body.returnUrl - Return URL
+ * @return {object} 200 - Payment initialized
+ * @return {object} 400 - Invalid provider or payload
+ * @return {object} 401 - Unauthorized
+ * @return {object} 500 - Internal Server Error
+ */
 
 router.post(
   '/payment/initiate',
@@ -164,6 +240,19 @@ router.post(
   })
 );
 
+/**
+ * POST /api/v1/auth/logout
+ * @summary Logout current session
+ * @description Revoke current access token from Authorization header or body.
+ * @tags Auth
+ * @security bearerAuth
+ * @param {object} request.body - Optional body payload
+ * @param {string} request.body.token - Fallback access token when header is absent
+ * @return {object} 200 - Logout successful
+ * @return {object} 401 - Missing or invalid token
+ * @return {object} 500 - Internal Server Error
+ */
+
 router.post(
   '/logout',
   asyncHandler(async (req, res) => {
@@ -183,6 +272,27 @@ router.post(
     }
   })
 );
+
+/**
+ * POST /api/v1/auth/payment/callback
+ * @summary Handle payment callback
+ * @description Validate provider/internal callback signature and finalize transaction.
+ * @tags Auth
+ * @param {string} x-idempotency-key.header.required - Idempotency key
+ * @param {string} x-callback-signature.header - Internal callback signature
+ * @param {string} x-callback-timestamp.header - Internal callback timestamp in ms
+ * @param {object} request.body.required - Callback payload
+ * @param {string} request.body.orderId - Provider order id
+ * @param {string} request.body.transactionId - Internal transaction id
+ * @param {string} request.body.status.required - success, failed, or cancelled
+ * @param {string} request.body.provider - vnpay or momo
+ * @param {object} request.body.gatewayPayload - Raw provider callback payload
+ * @param {string} request.body.deviceId - Device identifier
+ * @return {object} 200 - Callback accepted and processed
+ * @return {object} 400 - Invalid callback payload
+ * @return {object} 401 - Invalid callback signature
+ * @return {object} 500 - Internal Server Error
+ */
 
 router.post(
   '/payment/callback',

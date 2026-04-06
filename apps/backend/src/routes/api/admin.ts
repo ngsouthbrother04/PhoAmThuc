@@ -69,6 +69,20 @@ const handleImageUpload: RequestHandler = (req, res, next) => {
   });
 };
 
+/**
+ * POST /api/v1/admin/pois/:id/audio/generate
+ * @summary Queue TTS generation for POI
+ * @description Enqueue server-side TTS jobs for all available languages of a POI.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} id.path.required - POI identifier
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @return {object} 202 - Queue accepted
+ * @return {object} 400 - Missing POI id
+ * @return {object} 403 - Forbidden
+ * @return {object} 500 - Internal Server Error
+ */
+
 router.post(
   '/pois/:id/audio/generate',
   asyncHandler(async (req, res) => {
@@ -86,6 +100,21 @@ router.post(
     });
   })
 );
+
+/**
+ * POST /api/v1/admin/pois/:id/image/upload
+ * @summary Upload POI image
+ * @description Upload image file for a POI to image storage provider.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} id.path.required - POI identifier
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @param {file} image.formData.required - Image file
+ * @return {object} 200 - Upload successful
+ * @return {object} 400 - Invalid file or missing input
+ * @return {object} 403 - Forbidden
+ * @return {object} 500 - Internal Server Error
+ */
 
 router.post(
   '/pois/:id/image/upload',
@@ -114,6 +143,21 @@ router.post(
   })
 );
 
+/**
+ * POST /api/v1/admin/tours/:id/image/upload
+ * @summary Upload tour image
+ * @description Upload image file for a tour to image storage provider.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} id.path.required - Tour identifier
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @param {file} image.formData.required - Image file
+ * @return {object} 200 - Upload successful
+ * @return {object} 400 - Invalid file or missing input
+ * @return {object} 403 - Forbidden
+ * @return {object} 500 - Internal Server Error
+ */
+
 router.post(
   '/tours/:id/image/upload',
   handleImageUpload,
@@ -141,6 +185,20 @@ router.post(
   })
 );
 
+/**
+ * POST /api/v1/admin/pois
+ * @summary Create POI
+ * @description Create a draft POI record with multilingual payload.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @param {object} request.body.required - POI create payload
+ * @return {object} 201 - POI created
+ * @return {object} 400 - Invalid payload
+ * @return {object} 403 - Forbidden
+ * @return {object} 500 - Internal Server Error
+ */
+
 router.post(
   '/pois',
   asyncHandler(async (req, res) => {
@@ -153,6 +211,22 @@ router.post(
     });
   })
 );
+
+/**
+ * POST /api/v1/admin/pois/:id/publish
+ * @summary Publish POI content
+ * @description Publish POI and enqueue TTS generation.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} id.path.required - POI identifier
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @param {object} request.body - Optional action metadata
+ * @param {string} request.body.reason - Publish reason
+ * @return {object} 200 - Publish successful
+ * @return {object} 400 - Missing POI id
+ * @return {object} 403 - Forbidden
+ * @return {object} 500 - Internal Server Error
+ */
 
 router.post(
   '/pois/:id/publish',
@@ -175,6 +249,18 @@ router.post(
   })
 );
 
+/**
+ * GET /api/v1/admin/pois
+ * @summary List POIs for admin
+ * @description Retrieve POIs including unpublished records for CMS usage.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @return {object} 200 - POI list
+ * @return {object} 403 - Forbidden
+ * @return {object} 500 - Internal Server Error
+ */
+
 router.get(
   '/pois',
   asyncHandler(async (req, res) => {
@@ -187,6 +273,21 @@ router.get(
     });
   })
 );
+
+/**
+ * GET /api/v1/admin/pois/:id
+ * @summary Get POI detail for admin
+ * @description Retrieve a single POI record including admin-only fields.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} id.path.required - POI identifier
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @return {object} 200 - POI detail
+ * @return {object} 400 - Missing POI id
+ * @return {object} 403 - Forbidden
+ * @return {object} 404 - Not found
+ * @return {object} 500 - Internal Server Error
+ */
 
 router.get(
   '/pois/:id',
@@ -204,6 +305,22 @@ router.get(
     });
   })
 );
+
+/**
+ * PUT /api/v1/admin/pois/:id
+ * @summary Update POI
+ * @description Update POI fields in draft/admin context.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} id.path.required - POI identifier
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @param {object} request.body.required - POI update payload
+ * @return {object} 200 - POI updated
+ * @return {object} 400 - Invalid payload or missing id
+ * @return {object} 403 - Forbidden
+ * @return {object} 404 - Not found
+ * @return {object} 500 - Internal Server Error
+ */
 
 router.put(
   '/pois/:id',
@@ -223,6 +340,23 @@ router.put(
   })
 );
 
+/**
+ * DELETE /api/v1/admin/pois/:id
+ * @summary Soft delete POI
+ * @description Soft-delete POI and hide from sync outputs.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} id.path.required - POI identifier
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @param {object} request.body - Optional action metadata
+ * @param {string} request.body.reason - Delete reason
+ * @return {object} 200 - POI deleted
+ * @return {object} 400 - Missing POI id
+ * @return {object} 403 - Forbidden
+ * @return {object} 404 - Not found
+ * @return {object} 500 - Internal Server Error
+ */
+
 router.delete(
   '/pois/:id',
   asyncHandler(async (req, res) => {
@@ -241,6 +375,20 @@ router.delete(
   })
 );
 
+/**
+ * POST /api/v1/admin/tours
+ * @summary Create tour
+ * @description Create a tour with ordered POI references.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @param {object} request.body.required - Tour create payload
+ * @return {object} 201 - Tour created
+ * @return {object} 400 - Invalid payload
+ * @return {object} 403 - Forbidden
+ * @return {object} 500 - Internal Server Error
+ */
+
 router.post(
   '/tours',
   asyncHandler(async (req, res) => {
@@ -253,6 +401,21 @@ router.post(
     });
   })
 );
+
+/**
+ * GET /api/v1/admin/tours/:id
+ * @summary Get tour detail for admin
+ * @description Retrieve a single tour record including admin fields.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} id.path.required - Tour identifier
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @return {object} 200 - Tour detail
+ * @return {object} 400 - Missing tour id
+ * @return {object} 403 - Forbidden
+ * @return {object} 404 - Not found
+ * @return {object} 500 - Internal Server Error
+ */
 
 router.get(
   '/tours/:id',
@@ -270,6 +433,22 @@ router.get(
     });
   })
 );
+
+/**
+ * PUT /api/v1/admin/tours/:id
+ * @summary Update tour
+ * @description Update tour metadata and ordered POI references.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} id.path.required - Tour identifier
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @param {object} request.body.required - Tour update payload
+ * @return {object} 200 - Tour updated
+ * @return {object} 400 - Invalid payload or missing id
+ * @return {object} 403 - Forbidden
+ * @return {object} 404 - Not found
+ * @return {object} 500 - Internal Server Error
+ */
 
 router.put(
   '/tours/:id',
@@ -289,6 +468,23 @@ router.put(
   })
 );
 
+/**
+ * DELETE /api/v1/admin/tours/:id
+ * @summary Soft delete tour
+ * @description Soft-delete a tour from admin CMS.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} id.path.required - Tour identifier
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @param {object} request.body - Optional action metadata
+ * @param {string} request.body.reason - Delete reason
+ * @return {object} 200 - Tour deleted
+ * @return {object} 400 - Missing tour id
+ * @return {object} 403 - Forbidden
+ * @return {object} 404 - Not found
+ * @return {object} 500 - Internal Server Error
+ */
+
 router.delete(
   '/tours/:id',
   asyncHandler(async (req, res) => {
@@ -306,6 +502,21 @@ router.delete(
     });
   })
 );
+
+/**
+ * POST /api/v1/admin/maintenance/pois/soft-delete-cleanup
+ * @summary Cleanup retained soft-deleted POIs
+ * @description Run dry-run or execute cleanup for expired soft-deleted POI data and media.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @param {object} request.body - Cleanup payload
+ * @param {boolean} request.body.dryRun - Dry-run mode
+ * @param {string} request.body.reason - Cleanup reason
+ * @return {object} 200 - Cleanup result
+ * @return {object} 403 - Forbidden
+ * @return {object} 500 - Internal Server Error
+ */
 
 router.post(
   '/maintenance/pois/soft-delete-cleanup',
@@ -325,6 +536,18 @@ router.post(
   })
 );
 
+/**
+ * POST /api/v1/admin/sync/invalidate
+ * @summary Invalidate sync manifest
+ * @description Force clients to re-evaluate sync version.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @return {object} 200 - Manifest invalidated
+ * @return {object} 403 - Forbidden
+ * @return {object} 500 - Internal Server Error
+ */
+
 router.post(
   '/sync/invalidate',
   asyncHandler(async (req, res) => {
@@ -338,6 +561,18 @@ router.post(
   })
 );
 
+/**
+ * GET /api/v1/admin/tts/queue/status
+ * @summary Get TTS queue status
+ * @description Return queue metrics for TTS processing.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @return {object} 200 - Queue status
+ * @return {object} 403 - Forbidden
+ * @return {object} 500 - Internal Server Error
+ */
+
 router.get(
   '/tts/queue/status',
   asyncHandler(async (req, res) => {
@@ -347,6 +582,18 @@ router.get(
     return res.status(200).json(status);
   })
 );
+
+/**
+ * GET /api/v1/admin/tts/config/validate
+ * @summary Validate TTS runtime configuration
+ * @description Return runtime validation diagnostics for TTS provider setup.
+ * @tags Admin
+ * @security adminApiKey
+ * @param {string} x-admin-api-key.header - Admin API key
+ * @return {object} 200 - Configuration valid
+ * @return {object} 403 - Forbidden
+ * @return {object} 500 - Configuration invalid or internal error
+ */
 
 router.get(
   '/tts/config/validate',

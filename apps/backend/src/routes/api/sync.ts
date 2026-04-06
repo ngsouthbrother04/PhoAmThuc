@@ -7,6 +7,17 @@ import ApiError from '../../utils/ApiError';
 
 const router = Router();
 
+/**
+ * GET /api/v1/sync/manifest
+ * @summary Get sync manifest
+ * @description Return current content version and metadata for sync decision.
+ * @tags Sync
+ * @security bearerAuth
+ * @return {object} 200 - Manifest response
+ * @return {object} 401 - Unauthorized
+ * @return {object} 500 - Internal Server Error
+ */
+
 router.get(
   '/manifest',
   requireAuth,
@@ -16,6 +27,19 @@ router.get(
     return res.status(200).json(manifest);
   })
 );
+
+/**
+ * GET /api/v1/sync/full
+ * @summary Get full sync payload
+ * @description Return full POI and tour content for bootstrap or fallback sync.
+ * @tags Sync
+ * @security bearerAuth
+ * @param {number} version.query - Client content version for short-circuit check
+ * @return {object} 200 - Full sync or needsSync false short-circuit response
+ * @return {object} 400 - Invalid query parameter
+ * @return {object} 401 - Unauthorized
+ * @return {object} 500 - Internal Server Error
+ */
 
 router.get(
   '/full',
@@ -49,6 +73,21 @@ router.get(
     });
   })
 );
+
+/**
+ * POST /api/v1/sync/incremental
+ * @summary Get incremental sync payload
+ * @description Return delta changes from a given version or require full sync.
+ * @tags Sync
+ * @security bearerAuth
+ * @param {object} request.body.required - Incremental sync payload
+ * @param {number} request.body.fromVersion.required - Client content version
+ * @return {object} 200 - Incremental changes response
+ * @return {object} 400 - Invalid body payload
+ * @return {object} 401 - Unauthorized
+ * @return {object} 409 - Delta window exceeded, full sync required
+ * @return {object} 500 - Internal Server Error
+ */
 
 router.post(
   '/incremental',

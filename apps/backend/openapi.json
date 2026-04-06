@@ -14,7 +14,7 @@
   "paths": {
     "/": {
       "get": {
-        "description": "",
+        "description": "Check backend availability and database connectivity.",
         "responses": {
           "200": {
             "description": "OK"
@@ -27,15 +27,23 @@
           "System"
         ],
         "security": [],
-        "operationId": "get_"
+        "operationId": "get_",
+        "summary": "Health check"
       }
     },
     "/api/v1/auth/register": {
       "post": {
-        "description": "",
+        "description": "Create a new account with email and password.",
         "responses": {
           "201": {
-            "description": "Created"
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionResponse"
+                }
+              }
+            }
           },
           "500": {
             "description": "Internal Server Error",
@@ -75,15 +83,23 @@
           "Auth"
         ],
         "security": [],
-        "operationId": "post_api_v1_auth_register"
+        "operationId": "post_api_v1_auth_register",
+        "summary": "Register account"
       }
     },
     "/api/v1/auth/login": {
       "post": {
-        "description": "",
+        "description": "Authenticate user and return auth tokens.",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionResponse"
+                }
+              }
+            }
           },
           "500": {
             "description": "Internal Server Error",
@@ -120,12 +136,13 @@
           "Auth"
         ],
         "security": [],
-        "operationId": "post_api_v1_auth_login"
+        "operationId": "post_api_v1_auth_login",
+        "summary": "Login account"
       }
     },
     "/api/v1/auth/payment/claim": {
       "post": {
-        "description": "",
+        "description": "Redeem access code for authenticated user.",
         "parameters": [
           {
             "name": "authorization",
@@ -137,7 +154,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -168,15 +192,23 @@
             "bearerAuth": []
           }
         ],
-        "operationId": "post_api_v1_auth_payment_claim"
+        "operationId": "post_api_v1_auth_payment_claim",
+        "summary": "Redeem claim code"
       }
     },
     "/api/v1/auth/token-refresh": {
       "post": {
-        "description": "",
+        "description": "Refresh auth session by refresh token.",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthRefreshResponse"
+                }
+              }
+            }
           },
           "500": {
             "description": "Internal Server Error",
@@ -190,13 +222,17 @@
           }
         },
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "refreshToken"
+                ],
                 "properties": {
                   "refreshToken": {
-                    "example": "any"
+                    "type": "string"
                   }
                 }
               }
@@ -207,12 +243,13 @@
           "Auth"
         ],
         "security": [],
-        "operationId": "post_api_v1_auth_token-refresh"
+        "operationId": "post_api_v1_auth_token_refresh",
+        "summary": "Refresh access token"
       }
     },
     "/api/v1/auth/payment/initiate": {
       "post": {
-        "description": "",
+        "description": "Create payment transaction for authenticated user.",
         "parameters": [
           {
             "name": "authorization",
@@ -224,7 +261,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentInitiateResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -248,25 +292,41 @@
           }
         },
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "amount"
+                ],
                 "properties": {
                   "paymentMethod": {
-                    "example": "any"
+                    "type": "string",
+                    "enum": [
+                      "vnpay",
+                      "momo"
+                    ]
                   },
                   "provider": {
-                    "example": "any"
+                    "type": "string",
+                    "enum": [
+                      "vnpay",
+                      "momo"
+                    ]
+                  },
+                  "amount": {
+                    "type": "number"
                   },
                   "currency": {
-                    "example": "any"
+                    "type": "string",
+                    "default": "VND"
                   },
                   "deviceId": {
-                    "example": "any"
+                    "type": "string"
                   },
                   "returnUrl": {
-                    "example": "any"
+                    "type": "string"
                   }
                 }
               }
@@ -281,12 +341,13 @@
             "bearerAuth": []
           }
         ],
-        "operationId": "post_api_v1_auth_payment_initiate"
+        "operationId": "post_api_v1_auth_payment_initiate",
+        "summary": "Initiate payment"
       }
     },
     "/api/v1/auth/logout": {
       "post": {
-        "description": "",
+        "description": "Revoke current access token from header or request body.",
         "parameters": [
           {
             "name": "authorization",
@@ -298,7 +359,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -343,12 +411,13 @@
             "bearerAuth": []
           }
         ],
-        "operationId": "post_api_v1_auth_logout"
+        "operationId": "post_api_v1_auth_logout",
+        "summary": "Logout session"
       }
     },
     "/api/v1/auth/payment/callback": {
       "post": {
-        "description": "",
+        "description": "Validate callback signature and finalize payment status.",
         "parameters": [
           {
             "name": "x-idempotency-key",
@@ -374,7 +443,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentCallbackResponse"
+                }
+              }
+            }
           },
           "500": {
             "description": "Internal Server Error",
@@ -388,28 +464,44 @@
           }
         },
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "status"
+                ],
                 "properties": {
                   "orderId": {
-                    "example": "any"
+                    "type": "string"
                   },
                   "transactionId": {
-                    "example": "any"
+                    "type": "string"
                   },
                   "status": {
-                    "example": "any"
-                  },
-                  "deviceId": {
-                    "example": "any"
+                    "type": "string",
+                    "enum": [
+                      "success",
+                      "failed",
+                      "cancelled",
+                      "succeeded",
+                      "fail",
+                      "canceled"
+                    ]
                   },
                   "provider": {
-                    "example": "any"
+                    "type": "string",
+                    "enum": [
+                      "vnpay",
+                      "momo"
+                    ]
                   },
                   "gatewayPayload": {
-                    "example": "any"
+                    "type": "object"
+                  },
+                  "deviceId": {
+                    "type": "string"
                   }
                 }
               }
@@ -420,12 +512,13 @@
           "Auth"
         ],
         "security": [],
-        "operationId": "post_api_v1_auth_payment_callback"
+        "operationId": "post_api_v1_auth_payment_callback",
+        "summary": "Handle payment callback"
       }
     },
     "/api/v1/sync/manifest": {
       "get": {
-        "description": "",
+        "description": "Return current content version and sync metadata.",
         "parameters": [
           {
             "name": "authorization",
@@ -437,7 +530,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncManifestResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -468,18 +568,19 @@
             "bearerAuth": []
           }
         ],
-        "operationId": "get_api_v1_sync_manifest"
+        "operationId": "get_api_v1_sync_manifest",
+        "summary": "Get sync manifest"
       }
     },
     "/api/v1/sync/full": {
       "get": {
-        "description": "",
+        "description": "Return full POI and tour data for bootstrap or fallback sync.",
         "parameters": [
           {
             "name": "version",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "integer"
             }
           },
           {
@@ -492,7 +593,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncFullResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -523,12 +631,13 @@
             "bearerAuth": []
           }
         ],
-        "operationId": "get_api_v1_sync_full"
+        "operationId": "get_api_v1_sync_full",
+        "summary": "Get full sync payload"
       }
     },
     "/api/v1/sync/incremental": {
       "post": {
-        "description": "",
+        "description": "Return delta changes from a client content version.",
         "parameters": [
           {
             "name": "authorization",
@@ -540,7 +649,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncIncrementalSuccessResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -553,7 +669,14 @@
             }
           },
           "409": {
-            "description": "Conflict"
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncIncrementalConflictResponse"
+                }
+              }
+            }
           },
           "500": {
             "description": "Internal Server Error",
@@ -567,13 +690,17 @@
           }
         },
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "fromVersion"
+                ],
                 "properties": {
                   "fromVersion": {
-                    "example": "any"
+                    "type": "integer"
                   }
                 }
               }
@@ -588,12 +715,13 @@
             "bearerAuth": []
           }
         ],
-        "operationId": "post_api_v1_sync_incremental"
+        "operationId": "post_api_v1_sync_incremental",
+        "summary": "Get incremental sync payload"
       }
     },
     "/api/v1/admin/pois/{id}/audio/generate": {
       "post": {
-        "description": "",
+        "description": "Enqueue server-side TTS jobs for a POI.",
         "parameters": [
           {
             "name": "id",
@@ -613,7 +741,14 @@
         ],
         "responses": {
           "202": {
-            "description": "Accepted"
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAudioGenerateResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -644,12 +779,13 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "post_api_v1_admin_pois_id_audio_generate"
+        "operationId": "post_api_v1_admin_pois_id_audio_generate",
+        "summary": "Queue POI TTS generation"
       }
     },
     "/api/v1/admin/pois/{id}/image/upload": {
       "post": {
-        "description": "",
+        "description": "Upload image file for a POI.",
         "parameters": [
           {
             "name": "id",
@@ -669,7 +805,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPoiImageUploadResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -700,12 +843,32 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "post_api_v1_admin_pois_id_image_upload"
+        "operationId": "post_api_v1_admin_pois_id_image_upload",
+        "summary": "Upload POI image",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "image"
+                ],
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/admin/tours/{id}/image/upload": {
       "post": {
-        "description": "",
+        "description": "Upload image file for a tour.",
         "parameters": [
           {
             "name": "id",
@@ -725,7 +888,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTourImageUploadResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -756,12 +926,32 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "post_api_v1_admin_tours_id_image_upload"
+        "operationId": "post_api_v1_admin_tours_id_image_upload",
+        "summary": "Upload tour image",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "image"
+                ],
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/admin/pois": {
       "post": {
-        "description": "",
+        "description": "Create POI record from CMS payload.",
         "parameters": [
           {
             "name": "x-admin-api-key",
@@ -773,7 +963,14 @@
         ],
         "responses": {
           "201": {
-            "description": "Created"
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPoiMutationResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -804,10 +1001,11 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "post_api_v1_admin_pois"
+        "operationId": "post_api_v1_admin_pois",
+        "summary": "Create POI"
       },
       "get": {
-        "description": "",
+        "description": "List POIs including unpublished records for CMS.",
         "parameters": [
           {
             "name": "x-admin-api-key",
@@ -819,7 +1017,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPoiListResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -850,12 +1055,13 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "get_api_v1_admin_pois"
+        "operationId": "get_api_v1_admin_pois",
+        "summary": "List POIs for admin"
       }
     },
     "/api/v1/admin/pois/{id}/publish": {
       "post": {
-        "description": "",
+        "description": "Publish POI and trigger TTS queue.",
         "parameters": [
           {
             "name": "id",
@@ -875,7 +1081,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPoiPublishResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -906,12 +1119,13 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "post_api_v1_admin_pois_id_publish"
+        "operationId": "post_api_v1_admin_pois_id_publish",
+        "summary": "Publish POI"
       }
     },
     "/api/v1/admin/pois/{id}": {
       "get": {
-        "description": "",
+        "description": "Retrieve POI by id for CMS.",
         "parameters": [
           {
             "name": "id",
@@ -931,7 +1145,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPoiRecord"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -962,10 +1183,11 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "get_api_v1_admin_pois_id"
+        "operationId": "get_api_v1_admin_pois_id",
+        "summary": "Get POI detail for admin"
       },
       "put": {
-        "description": "",
+        "description": "Update POI fields for CMS.",
         "parameters": [
           {
             "name": "id",
@@ -985,7 +1207,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPoiMutationResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -1016,10 +1245,11 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "put_api_v1_admin_pois_id"
+        "operationId": "put_api_v1_admin_pois_id",
+        "summary": "Update POI"
       },
       "delete": {
-        "description": "",
+        "description": "Soft delete POI from CMS.",
         "parameters": [
           {
             "name": "id",
@@ -1039,7 +1269,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPoiMutationResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -1070,12 +1307,13 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "delete_api_v1_admin_pois_id"
+        "operationId": "delete_api_v1_admin_pois_id",
+        "summary": "Delete POI"
       }
     },
     "/api/v1/admin/tours": {
       "post": {
-        "description": "",
+        "description": "Create tour with ordered POI sequence.",
         "parameters": [
           {
             "name": "x-admin-api-key",
@@ -1087,7 +1325,14 @@
         ],
         "responses": {
           "201": {
-            "description": "Created"
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTourMutationResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -1118,12 +1363,13 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "post_api_v1_admin_tours"
+        "operationId": "post_api_v1_admin_tours",
+        "summary": "Create tour"
       }
     },
     "/api/v1/admin/tours/{id}": {
       "get": {
-        "description": "",
+        "description": "Retrieve tour by id for CMS.",
         "parameters": [
           {
             "name": "id",
@@ -1143,7 +1389,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTourRecord"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -1174,10 +1427,11 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "get_api_v1_admin_tours_id"
+        "operationId": "get_api_v1_admin_tours_id",
+        "summary": "Get tour detail for admin"
       },
       "put": {
-        "description": "",
+        "description": "Update tour fields for CMS.",
         "parameters": [
           {
             "name": "id",
@@ -1197,7 +1451,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTourMutationResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -1228,10 +1489,11 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "put_api_v1_admin_tours_id"
+        "operationId": "put_api_v1_admin_tours_id",
+        "summary": "Update tour"
       },
       "delete": {
-        "description": "",
+        "description": "Soft delete tour from CMS.",
         "parameters": [
           {
             "name": "id",
@@ -1251,7 +1513,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTourMutationResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -1282,12 +1551,13 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "delete_api_v1_admin_tours_id"
+        "operationId": "delete_api_v1_admin_tours_id",
+        "summary": "Delete tour"
       }
     },
     "/api/v1/admin/maintenance/pois/soft-delete-cleanup": {
       "post": {
-        "description": "",
+        "description": "Run dry-run or execute soft-delete retention cleanup.",
         "parameters": [
           {
             "name": "x-admin-api-key",
@@ -1299,7 +1569,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRetentionCleanupResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -1330,12 +1607,31 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "post_api_v1_admin_maintenance_pois_soft-delete-cleanup"
+        "operationId": "post_api_v1_admin_maintenance_pois_soft_delete_cleanup",
+        "summary": "Run POI retention cleanup",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dryRun": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/admin/sync/invalidate": {
       "post": {
-        "description": "",
+        "description": "Force clients to refresh sync metadata.",
         "parameters": [
           {
             "name": "x-admin-api-key",
@@ -1347,7 +1643,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSyncInvalidateResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -1378,12 +1681,13 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "post_api_v1_admin_sync_invalidate"
+        "operationId": "post_api_v1_admin_sync_invalidate",
+        "summary": "Invalidate sync manifest"
       }
     },
     "/api/v1/admin/tts/queue/status": {
       "get": {
-        "description": "",
+        "description": "Return queue counts and worker status.",
         "parameters": [
           {
             "name": "x-admin-api-key",
@@ -1395,7 +1699,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTtsQueueStatusResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -1426,12 +1737,13 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "get_api_v1_admin_tts_queue_status"
+        "operationId": "get_api_v1_admin_tts_queue_status",
+        "summary": "Get TTS queue status"
       }
     },
     "/api/v1/admin/tts/config/validate": {
       "get": {
-        "description": "",
+        "description": "Validate runtime TTS configuration.",
         "parameters": [
           {
             "name": "x-admin-api-key",
@@ -1443,7 +1755,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTtsConfigValidationResponse"
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden",
@@ -1467,12 +1786,13 @@
             "adminApiKey": []
           }
         ],
-        "operationId": "get_api_v1_admin_tts_config_validate"
+        "operationId": "get_api_v1_admin_tts_config_validate",
+        "summary": "Validate TTS config"
       }
     },
-    "/api/v1/pois/": {
+    "/api/v1/pois": {
       "get": {
-        "description": "",
+        "description": "Get paginated POI list for user subscription.",
         "parameters": [
           {
             "name": "page",
@@ -1498,7 +1818,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicPoiListResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -1529,12 +1856,13 @@
             "bearerAuth": []
           }
         ],
-        "operationId": "get_api_v1_pois_"
+        "operationId": "get_api_v1_pois",
+        "summary": "List POIs"
       }
     },
     "/api/v1/pois/{id}": {
       "get": {
-        "description": "",
+        "description": "Get POI detail by id for user subscription.",
         "parameters": [
           {
             "name": "id",
@@ -1554,7 +1882,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicPoiDetailResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -1585,12 +1920,13 @@
             "bearerAuth": []
           }
         ],
-        "operationId": "get_api_v1_pois_id"
+        "operationId": "get_api_v1_pois_id",
+        "summary": "Get POI detail"
       }
     },
     "/api/v1/pois/search/radius": {
       "post": {
-        "description": "",
+        "description": "Search nearby POIs using latitude, longitude, and radius.",
         "parameters": [
           {
             "name": "authorization",
@@ -1602,7 +1938,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoiRadiusSearchResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -1626,22 +1969,29 @@
           }
         },
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "latitude",
+                  "longitude",
+                  "radiusM"
+                ],
                 "properties": {
                   "latitude": {
-                    "example": "any"
+                    "type": "number"
                   },
                   "longitude": {
-                    "example": "any"
+                    "type": "number"
                   },
                   "radiusM": {
-                    "example": "any"
+                    "type": "number"
                   },
                   "limit": {
-                    "example": "any"
+                    "type": "integer",
+                    "default": 20
                   }
                 }
               }
@@ -1656,12 +2006,13 @@
             "bearerAuth": []
           }
         ],
-        "operationId": "post_api_v1_pois_search_radius"
+        "operationId": "post_api_v1_pois_search_radius",
+        "summary": "Search POIs by radius"
       }
     },
-    "/api/v1/tours/": {
+    "/api/v1/tours": {
       "get": {
-        "description": "",
+        "description": "Get paginated tour list for user subscription.",
         "parameters": [
           {
             "name": "page",
@@ -1687,7 +2038,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicTourListResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -1718,12 +2076,13 @@
             "bearerAuth": []
           }
         ],
-        "operationId": "get_api_v1_tours_"
+        "operationId": "get_api_v1_tours",
+        "summary": "List tours"
       }
     },
     "/api/v1/tours/{id}": {
       "get": {
-        "description": "",
+        "description": "Get tour detail by id for user subscription.",
         "parameters": [
           {
             "name": "id",
@@ -1743,7 +2102,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicTourDetailResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -1774,12 +2140,13 @@
             "bearerAuth": []
           }
         ],
-        "operationId": "get_api_v1_tours_id"
+        "operationId": "get_api_v1_tours_id",
+        "summary": "Get tour detail"
       }
     },
     "/api/v1/analytics/events": {
       "post": {
-        "description": "",
+        "description": "Upload analytics events in batch.",
         "parameters": [
           {
             "name": "authorization",
@@ -1791,7 +2158,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsEventsResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -1815,13 +2189,43 @@
           }
         },
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "events"
+                ],
                 "properties": {
                   "events": {
-                    "example": "any"
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "deviceId": {
+                          "type": "string"
+                        },
+                        "sessionId": {
+                          "type": "string"
+                        },
+                        "poiId": {
+                          "type": "string"
+                        },
+                        "action": {
+                          "type": "string"
+                        },
+                        "durationMs": {
+                          "type": "integer"
+                        },
+                        "language": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "integer"
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -1836,12 +2240,13 @@
             "bearerAuth": []
           }
         ],
-        "operationId": "post_api_v1_analytics_events"
+        "operationId": "post_api_v1_analytics_events",
+        "summary": "Upload analytics events"
       }
     },
     "/api/v1/analytics/presence/heartbeat": {
       "post": {
-        "description": "",
+        "description": "Update online and active user windows by heartbeat.",
         "parameters": [
           {
             "name": "authorization",
@@ -1853,7 +2258,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresenceHeartbeatResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -1884,12 +2296,48 @@
             "bearerAuth": []
           }
         ],
-        "operationId": "post_api_v1_analytics_presence_heartbeat"
+        "operationId": "post_api_v1_analytics_presence_heartbeat",
+        "summary": "Send presence heartbeat",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "deviceId",
+                  "sessionId",
+                  "timestamp"
+                ],
+                "properties": {
+                  "deviceId": {
+                    "type": "string"
+                  },
+                  "sessionId": {
+                    "type": "string"
+                  },
+                  "appState": {
+                    "type": "string"
+                  },
+                  "audioState": {
+                    "type": "string"
+                  },
+                  "timestamp": {
+                    "type": "integer"
+                  },
+                  "language": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/analytics/stats": {
       "get": {
-        "description": "",
+        "description": "Get analytics summary metrics.",
         "parameters": [
           {
             "name": "authorization",
@@ -1901,7 +2349,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsStatsResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -1932,7 +2387,8 @@
             "bearerAuth": []
           }
         ],
-        "operationId": "get_api_v1_analytics_stats"
+        "operationId": "get_api_v1_analytics_stats",
+        "summary": "Get analytics stats"
       }
     }
   },
@@ -1963,6 +2419,759 @@
               "message": {
                 "type": "string",
                 "example": "Validation failed"
+              }
+            }
+          }
+        }
+      },
+      "LanguageMap": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          }
+        }
+      },
+      "PublicPoiItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "$ref": "#/components/schemas/LanguageMap"
+          },
+          "description": {
+            "$ref": "#/components/schemas/LanguageMap"
+          },
+          "audioUrls": {
+            "$ref": "#/components/schemas/LanguageMap"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "type": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PublicTourItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "$ref": "#/components/schemas/LanguageMap"
+          },
+          "description": {
+            "$ref": "#/components/schemas/LanguageMap"
+          },
+          "duration": {
+            "type": "integer"
+          },
+          "poiIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PublicPoiListResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PublicPoiItem"
+                }
+              },
+              "pagination": {
+                "$ref": "#/components/schemas/Pagination"
+              }
+            }
+          }
+        }
+      },
+      "PublicPoiDetailResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PublicPoiItem"
+          }
+        }
+      },
+      "PublicTourListResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PublicTourItem"
+                }
+              },
+              "pagination": {
+                "$ref": "#/components/schemas/Pagination"
+              }
+            }
+          }
+        }
+      },
+      "PublicTourDetailResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PublicTourItem"
+          }
+        }
+      },
+      "AuthSessionResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "expiresIn": {
+            "type": "number"
+          },
+          "user": {
+            "type": "object"
+          }
+        }
+      },
+      "AuthRefreshResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "expiresIn": {
+            "type": "number"
+          }
+        }
+      },
+      "PaymentInitiateResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "transactionId": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "paymentUrl": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "LogoutResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "PaymentCallbackResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "expiresIn": {
+            "type": "number"
+          },
+          "deviceId": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "SyncManifestResponse": {
+        "type": "object",
+        "properties": {
+          "contentVersion": {
+            "type": "integer"
+          },
+          "totalPois": {
+            "type": "integer"
+          },
+          "totalTours": {
+            "type": "integer"
+          },
+          "lastUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checksum": {
+            "type": "string"
+          }
+        }
+      },
+      "SyncFullResponse": {
+        "type": "object",
+        "properties": {
+          "contentVersion": {
+            "type": "integer"
+          },
+          "needsSync": {
+            "type": "boolean"
+          },
+          "pois": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicPoiItem"
+            }
+          },
+          "tours": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicTourItem"
+            }
+          }
+        }
+      },
+      "SyncIncrementalSuccessResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "data": {
+            "type": "object"
+          }
+        }
+      },
+      "SyncIncrementalConflictResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "error"
+          },
+          "error": {
+            "type": "object"
+          },
+          "data": {
+            "type": "object"
+          }
+        }
+      },
+      "AdminPoiRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "$ref": "#/components/schemas/LanguageMap"
+          },
+          "description": {
+            "$ref": "#/components/schemas/LanguageMap"
+          },
+          "audioUrls": {
+            "$ref": "#/components/schemas/LanguageMap"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "type": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          },
+          "isPublished": {
+            "type": "boolean"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "contentVersion": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AdminTourRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "$ref": "#/components/schemas/LanguageMap"
+          },
+          "description": {
+            "$ref": "#/components/schemas/LanguageMap"
+          },
+          "duration": {
+            "type": "integer"
+          },
+          "poiIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          },
+          "isPublished": {
+            "type": "boolean"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "contentVersion": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AdminPoiMutationResponse": {
+        "type": "object",
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/AdminPoiRecord"
+          }
+        ]
+      },
+      "AdminTourMutationResponse": {
+        "type": "object",
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/AdminTourRecord"
+          }
+        ]
+      },
+      "AdminPoiListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminPoiRecord"
+            }
+          },
+          "total": {
+            "type": "integer"
+          }
+        }
+      },
+      "AdminPoiPublishResponse": {
+        "type": "object",
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "syncVersion": {
+                "type": "integer"
+              },
+              "ttsQueued": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/AdminPoiRecord"
+          }
+        ]
+      },
+      "AdminAudioGenerateResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "poiId": {
+            "type": "string"
+          },
+          "queued": {
+            "type": "integer"
+          },
+          "skipped": {
+            "type": "integer"
+          },
+          "jobIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "bullmq",
+              "in-memory"
+            ]
+          }
+        }
+      },
+      "AdminPoiImageUploadResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "poiId": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "contentVersion": {
+            "type": "integer"
+          }
+        }
+      },
+      "AdminTourImageUploadResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "tourId": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "contentVersion": {
+            "type": "integer"
+          }
+        }
+      },
+      "AdminRetentionCleanupResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "dryRun": {
+            "type": "boolean"
+          },
+          "retentionDays": {
+            "type": "integer"
+          },
+          "cutoffAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scanned": {
+            "type": "integer"
+          },
+          "purged": {
+            "type": "integer"
+          },
+          "deletedIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "audioFilesRemoved": {
+            "type": "integer"
+          },
+          "imagesRemoved": {
+            "type": "integer"
+          },
+          "imageCleanupFailed": {
+            "type": "integer"
+          }
+        }
+      },
+      "AdminSyncInvalidateResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "invalidated": {
+            "type": "boolean"
+          },
+          "syncVersion": {
+            "type": "integer"
+          }
+        }
+      },
+      "AdminTtsQueueStatusResponse": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "bullmq",
+              "in-memory"
+            ]
+          },
+          "waiting": {
+            "type": "integer"
+          },
+          "active": {
+            "type": "integer"
+          },
+          "completed": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "integer"
+          },
+          "delayed": {
+            "type": "integer"
+          }
+        }
+      },
+      "AdminTtsConfigValidationResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "queueMode": {
+            "type": "string",
+            "enum": [
+              "bullmq",
+              "in-memory"
+            ]
+          },
+          "storageProvider": {
+            "type": "string",
+            "enum": [
+              "local"
+            ]
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PoiRadiusSearchResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicPoiItem"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "radiusM": {
+                "type": "number"
+              },
+              "center": {
+                "type": "object",
+                "properties": {
+                  "latitude": {
+                    "type": "number"
+                  },
+                  "longitude": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "AnalyticsEventsResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "processedCount": {
+            "type": "integer"
+          },
+          "failedCount": {
+            "type": "integer"
+          }
+        }
+      },
+      "PresenceHeartbeatResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "onlineNowWindowSec": {
+            "type": "integer"
+          },
+          "active5mWindowSec": {
+            "type": "integer"
+          }
+        }
+      },
+      "AnalyticsStatsResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "plays": {
+                "type": "integer"
+              },
+              "qrScans": {
+                "type": "integer"
+              },
+              "topPois": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "poiId": {
+                      "type": "string"
+                    },
+                    "playCount": {
+                      "type": "integer"
+                    }
+                  }
+                }
               }
             }
           }
