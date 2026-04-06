@@ -1,0 +1,11 @@
+apis:
+  main:
+    root: ./openapi.json
+
+rules:
+  operation-operationId: error
+  operation-summary: off
+  no-unused-components: warn
+  no-server-example.com: off
+  security-defined: error
+  no-empty-servers: error
