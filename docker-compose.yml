@@ -2,12 +2,12 @@ services:
   postgres:
     image: postgis/postgis:16-3.4
     platform: linux/amd64
-    container_name: chua_linh_ung_db
+    container_name: pho_am_thuc_db
     restart: always
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password123
-      POSTGRES_DB: chua_linh_ung
+      POSTGRES_DB: pho_am_thuc
     ports:
       - "5433:5432"
     volumes:
@@ -15,7 +15,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: chua_linh_ung_cache
+    container_name: pho_am_thuc_cache
     restart: always
     ports:
       - "6379:6379"
