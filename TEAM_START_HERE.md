@@ -1,10 +1,132 @@
 # Team Start Here
 
-Team-wide onboarding entrypoint for consistent AI-assisted development.
+Tài liệu onboarding nhanh cho teammate làm FE cần cài đặt và chạy Backend server local.
 
-This file is intentionally short. All AI agents should read the same documents in the same order.
+Mục tiêu: FE có thể tự khởi động API để phát triển và test luồng mobile/web mà không cần chờ BE hỗ trợ thủ công.
 
-## Read Order (Mandatory)
+## 1) Yêu cầu môi trường
+
+- Node.js 20+
+- Docker Desktop (để chạy PostgreSQL + Redis)
+- npm
+
+Kiểm tra nhanh:
+
+```bash
+node -v
+docker -v
+```
+
+## 2) Cài dependencies
+
+Chạy tại thư mục root project:
+
+```bash
+npm install
+cd apps/backend && npm install
+```
+
+Lý do: dự án chưa cấu hình workspace package manager tập trung, nên backend cần cài dependency riêng.
+
+## 3) Chuẩn bị biến môi trường Backend
+
+Trong `apps/backend`:
+
+```bash
+cp .env.example .env
+```
+
+Giữ mặc định là đủ để chạy local với Docker compose hiện tại:
+
+- `DATABASE_URL=postgresql://admin:password123@localhost:5433/pho_am_thuc?schema=public`
+- `REDIS_URL=""` (để fallback in-memory queue)
+
+Nếu cần chạy queue bằng Redis thật, đặt:
+
+```env
+REDIS_URL="redis://localhost:6379"
+```
+
+## 4) Khởi động database services
+
+Tại root project:
+
+```bash
+npm run db:up
+```
+
+Lệnh này sẽ chạy:
+
+- PostgreSQL: `localhost:5433`
+- Redis: `localhost:6379`
+
+## 5) Migrate + generate client + seed data (lần đầu)
+
+Trong `apps/backend`:
+
+```bash
+npm run db:setup
+```
+
+`db:setup` gồm:
+
+1. `prisma migrate deploy`
+2. `prisma generate`
+3. `prisma seed`
+
+## 6) Chạy Backend server
+
+Chạy từ root (khuyến nghị):
+
+```bash
+npm run dev:backend
+```
+
+Hoặc chạy trực tiếp trong backend:
+
+```bash
+cd apps/backend
+npm run dev
+```
+
+API mặc định tại: `http://localhost:3000`
+
+## 7) Verify backend đã chạy đúng
+
+Mở trình duyệt hoặc curl:
+
+```bash
+curl http://localhost:3000/
+```
+
+Kết quả mong đợi có:
+
+- `message: "Mobile Backend is running!"`
+- `db_status: "Connected"`
+
+Xem API docs:
+
+- `http://localhost:3000/api-docs`
+
+## 8) Lỗi thường gặp
+
+1. `P1001` / không connect được DB:
+    - Kiểm tra Docker đã bật
+    - Chạy lại `npm run db:up`
+    - Xác nhận port `5433` chưa bị chiếm
+
+2. Backend chạy nhưng lỗi env:
+    - Kiểm tra đã có file `apps/backend/.env`
+    - Nếu mới pull code: chạy lại `cp .env.example .env`
+
+3. Lỗi Prisma client:
+    - Chạy `cd apps/backend && npm run prisma:generate`
+
+4. FE gọi API không được:
+    - Kiểm tra base URL FE đang trỏ đúng `http://localhost:3000`
+    - Nếu chạy trên device thật, không dùng `localhost`, dùng IP LAN máy dev
+
+## 9) Tài liệu cần đọc thêm (khi cần)
 
 1. README.md
 2. SPEC_CANONICAL.md
@@ -14,33 +136,9 @@ This file is intentionally short. All AI agents should read the same documents i
 6. docs/database_design.md
 7. USE_CASES.md
 8. docs/test_scenarios.md
-9. MASTER_INDEX.md
-10. IMPLEMENTATION_TASK_BREAKDOWN.md
-11. EXECUTION_TODO_ISSUES.md
-12. **Backend only**: SWAGGER_CONVENTION.md (API documentation standards)
-13. **Backend only**: OPENAPI_SCHEMA_ENHANCEMENT.md (for complex schema definitions)
 
-Terminology note:
-- AL_GUIDELINES.md in requests is treated as AI_GUIDELINES.md in this repository.
+## Lưu ý sản phẩm quan trọng
 
-## Working Rules
-
-1. Do not change behavior defaults (single voice rule/state transitions) without updating README.md and SPEC_CANONICAL.md first.
-2. Treat docs/prd as canonical PRD content.
-3. Use IMPLEMENTATION_TASK_BREAKDOWN.md for workstream planning and EXECUTION_TODO_ISSUES.md for issue-by-issue status tracking.
-4. **Unit and Integration Tests are Mandatory**: A feature is NOT done until mapped tests in docs/test_scenarios.md are implemented and passing.
-5. Never introduce geofence/background-GPS auto-trigger or on-device TTS generation.
-6. Enforce explicit trigger rule: narration starts only by user Tap or QR scan.
-7. For overlap zones: highlight can be multi-POI, but audio remains tap/QR only; recommendation (if any) must be deterministic.
-8. For TTS scaling: keep monolith + Redis queue with idempotent job keys and retry policy.
-9. For dashboard online users: use TTL metrics (`online_now`=90s, `active_5m`=5m), and label windows clearly.
-10. **Swagger/OpenAPI (Backend Only)**:
-    - All new routes MUST have JSDoc @summary, @description, @param, @return comments
-    - Before committing route changes, run: `npm run openapi:generate && npm run openapi:lint`
-    - Separate commits: code change first, then spec generation (`git commit -m "docs(openapi): regenerate"`)
-    - Follow SWAGGER_CONVENTION.md for JSDoc format and validation practices
-    - Complex schemas: refer to OPENAPI_SCHEMA_ENHANCEMENT.md for strategies
-    - Quick validation: `npm run openapi:diff-check` warns if spec appears out of date
-
-## Setup
-App strictly avoids geofencing and automatic GPS playback. Read the canonical docs before coding to keep Tap/QR trigger behavior, offline-first flow, and Single Voice Rule consistent.
+- Không auto-play theo GPS/geofence
+- Audio chỉ phát khi user Tap POI hoặc scan QR
+- Không dùng on-device TTS generation
