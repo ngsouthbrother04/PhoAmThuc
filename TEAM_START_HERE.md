@@ -1,8 +1,8 @@
 # Team Start Here
 
-Tài liệu onboarding nhanh cho teammate làm FE cần cài đặt và chạy Backend server local.
+Tài liệu onboarding nhanh cho teammate làm FE web cần cài đặt và chạy Backend server local.
 
-Mục tiêu: FE có thể tự khởi động API để phát triển và test luồng mobile/web mà không cần chờ BE hỗ trợ thủ công.
+Mục tiêu: FE có thể tự khởi động API để phát triển và test luồng web mà không cần chờ BE hỗ trợ thủ công.
 
 ## 1) Yêu cầu môi trường
 
@@ -101,7 +101,7 @@ curl http://localhost:3000/
 
 Kết quả mong đợi có:
 
-- `message: "Mobile Backend is running!"`
+- `message: "Backend is running!"`
 - `db_status: "Connected"`
 
 Xem API docs:

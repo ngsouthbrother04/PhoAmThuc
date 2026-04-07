@@ -14,7 +14,7 @@
 |-------|-----------|---------|-------|
 | **Primary DB** | PostgreSQL | Source of Truth | Server-side |
 | **Cache Layer** | Redis | Query optimization | Temporary data |
-| **Offline Client** | SQLite | Offline-first sync | Mobile device |
+| **Web Client** | Browser storage + runtime state | API-driven content | Browser |
 | **File Storage** | Audio Local FS + Image Cloudinary | Media (images, MP3) | `/audio/...` for MP3, Cloudinary URL for images |
 
 ```
@@ -29,8 +29,8 @@
        │           │
        ▼           ▼
    ┌─────────┐  ┌─────────┐
-   │ Redis   │  │ SQLite  │
-   │(Cache)  │  │(Mobile) │
+  │ Redis   │  │IndexedDB│
+  │(Cache)  │  │ (Web)   │
    └─────────┘  └─────────┘
                      │
                      ▼
@@ -323,7 +323,7 @@ CREATE INDEX idx_claim_codes_expires ON claim_codes(expires_at);
 
 #### **Table: analytics_events**
 
-**Mục đích**: Ghi lại sự kiện từ mobile app (tap, play, pause, stop, QR scan)
+**Mục đích**: Ghi lại sự kiện từ web app (tap, play, pause, stop, QR scan)
 
 ```sql
 CREATE TABLE analytics_events (
@@ -814,12 +814,12 @@ const publishPOI = async (poiId: string) => {
 
 ---
 
-## 7. SQLite Mobile Mirror Tables
+## 7. Web Client Data Contract
 
-Mobile app tạo bảng mirror offline (không cần đầy đủ ngôn ngữ, chỉ current language):
+Web app chỉ giữ state runtime và browser preferences; content is fetched from API per language:
 
 ```sql
--- Mobile SQLite (simplified offline structure)
+-- Browser client state (simplified)
 CREATE TABLE pois (
   id TEXT PRIMARY KEY,
   name TEXT,
@@ -828,7 +828,7 @@ CREATE TABLE pois (
   longitude REAL,
   type TEXT,
   image_url TEXT,
-  audio_url TEXT,  -- Current language only
+  audio_url TEXT,
   content_version INTEGER,
   synced_at INTEGER
 );
@@ -849,17 +849,19 @@ CREATE TABLE sync_metadata (
 );
 ```
 
-**Sync Flow**:
+**Content Flow**:
 ```
-Backend: `GET /api/v1/sync/full?language=vi`
+Backend: `GET /api/v1/pois?language=vi`
   ↓
-Returns: All POIs + Tours with Vietnamese strings (not JSONB)
+Returns: POIs with Vietnamese strings
   ↓
-Mobile SQLite: Atomic replace into pois, tours tables
+Backend: `GET /api/v1/tours`
   ↓
-Audio files: Downloaded to file system cache (expo-file-system)
+Returns: Tours for the current session
   ↓
-App ready: Offline exploration using local SQLite + cached MP3s
+Browser: Render data directly and fetch MP3s on demand
+  ↓
+App ready: Online-first exploration using live API data
 ```
 
 ---

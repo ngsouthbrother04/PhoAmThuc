@@ -15,7 +15,7 @@
 | **Functional Tests** | 20+   | Happy path, core features           |
 | **Edge Cases**       | 15+   | Boundary conditions, error handling |
 | **Multi-Language**   | 30+   | i18n behavior across 15 languages   |
-| **Location-Based**   | 10+   | GPS, offline, accuracy              |
+| **Location-Based**   | 10+   | GPS, accuracy, refresh behavior     |
 | **Performance**      | 8+    | Speed, memory, battery              |
 | **Integration**      | 12+   | Backend sync, payment, analytics    |
 
@@ -239,7 +239,7 @@ Rule: mỗi UC có đúng 1 AC chính và đúng 1 test gate chính để pass/f
 | ------------------- | ---------------------------------------------------- |
 | **Test Case ID**    | TC-4.4                                               |
 | **Title**           | QR contains POI ID not in local database             |
-| **Precondition**    | Mobile database doesn't have this POI (stale sync)   |
+| **Precondition**    | Browser store doesn't have this POI (stale sync)   |
 | **Steps**           | 1. Scan valid QR                                     |
 | **Expected Result** | ❌ Error: "Địa điểm không tồn tại" OR prompt to sync |
 | **Status**          | ⬜ Not Run                                           |
@@ -399,53 +399,53 @@ Rule: mỗi UC có đúng 1 AC chính và đúng 1 test gate chính để pass/f
 
 ## 3. Edge Case & Error Handling Test Scenarios
 
-### Scenario 8 – Offline Mode (UC8)
+### Scenario 8 – Network Unavailable (UC8)
 
-#### TC-8.1: Full Offline Exploration
+#### TC-8.1: Network Unavailable On Launch
 
 | Field               | Value                                                          |
 | ------------------- | -------------------------------------------------------------- |
 | **Test Case ID**    | TC-8.1                                                         |
-| **Title**           | App fully functional without internet                          |
-| **Precondition**    | WiFi/4G off, app previously synced                             |
-| **Steps**           | 1. Open app offline → 2. View map → 3. Tap POI → 4. Play audio |
-| **Expected Result** | ✅ Map loads, POIs visible, audio plays (all from local cache) |
+| **Title**           | App shows retry state when network is unavailable               |
+| **Precondition**    | WiFi/4G off                                                    |
+| **Steps**           | 1. Open app → 2. View network state                            |
+| **Expected Result** | ✅ App shows retry/unavailable state                           |
 | **Status**          | ⬜ Not Run                                                     |
 
-#### TC-8.2: Offline Sync Deferred
+#### TC-8.2: Refresh Deferred Until Online
 
 | Field               | Value                                            |
 | ------------------- | ------------------------------------------------ |
 | **Test Case ID**    | TC-8.2                                           |
-| **Title**           | Sync request queued while offline                |
-| **Steps**           | 1. Offline → 2. Tap "Sync" button                |
-| **Expected Result** | ⚠️ Queue sync, show "Sẽ đồng bộ khi có internet" |
+| **Title**           | Refresh request deferred while network is unavailable |
+| **Steps**           | 1. Network unavailable → 2. Tap "Refresh" button     |
+| **Expected Result** | ⚠️ Show retry message and wait for network           |
 | **Status**          | ⬜ Not Run                                       |
 
-#### TC-8.3: Analytics Buffered Offline
+#### TC-8.3: Analytics Retry on Reconnect
 
 | Field               | Value                                                              |
 | ------------------- | ------------------------------------------------------------------ |
 | **Test Case ID**    | TC-8.3                                                             |
-| **Title**           | Analytics events logged locally, uploaded when online              |
-| **Precondition**    | Offline, complete POI explorations                                 |
-| **Steps**           | 1. Tap/Play POIs (accumulate events) → 2. Go online → 3. App syncs |
-| **Expected Result** | ✅ Events buffered, uploaded on next sync                          |
+| **Title**           | Analytics events retry when network returns              |
+| **Precondition**    | Network unavailable, complete POI explorations          |
+| **Steps**           | 1. Tap/Play POIs → 2. Go online → 3. App retries upload |
+| **Expected Result** | ✅ Events retry successfully after reconnect            |
 | **Status**          | ⬜ Not Run                                                         |
 
 ---
 
 ### Scenario 9 – Data Corruption & Recovery
 
-#### TC-9.1: Corrupted SQLite Database
+#### TC-9.1: Invalid Cached State Detected
 
 | Field               | Value                                           |
 | ------------------- | ----------------------------------------------- |
 | **Test Case ID**    | TC-9.1                                          |
-| **Title**           | SQLite corruption detected and recovered        |
-| **Precondition**    | SQLite file corrupted (manually corrupt file)   |
+| **Title**           | Invalid client state detected and refreshed     |
+| **Precondition**    | Client state corrupted or inconsistent   |
 | **Steps**           | 1. Open app                                     |
-| **Expected Result** | ✅ App detects, wipes, re-downloads from server |
+| **Expected Result** | ✅ App detects issue and refreshes from server |
 | **Status**          | ⬜ Not Run                                      |
 
 #### TC-9.2: Missing Audio File
@@ -605,7 +605,7 @@ Rule: mỗi UC có đúng 1 AC chính và đúng 1 test gate chính để pass/f
 | **Test Case ID**    | TC-14.2                                          |
 | **Title**           | 30-min exploration consumes < 10% battery        |
 | **Precondition**    | Device at 100% battery                           |
-| **Steps**           | 1. Explore offline (GPS on, WiFi off) for 30 min |
+| **Steps**           | 1. Explore while network is unstable for 30 min |
 | **Expected Result** | ✅ < 10% battery drain                           |
 | **Status**          | ⬜ Not Run                                       |
 
@@ -641,7 +641,7 @@ Rule: mỗi UC có đúng 1 AC chính và đúng 1 test gate chính để pass/f
 | ------------------- | ----------------------------------------------------- |
 | **Test Case ID**    | TC-15.3                                               |
 | **Title**           | Analytics events collected & uploaded                 |
-| **Steps**           | 1. Explore offline (10 POIs tapped) → 2. Go online    |
+| **Steps**           | 1. Explore while disconnected (10 POIs tapped) → 2. Go online    |
 | **Expected Result** | ✅ Events batch uploaded to server, backend logs them |
 | **Status**          | ⬜ Not Run                                            |
 
@@ -650,10 +650,10 @@ Rule: mỗi UC có đúng 1 AC chính và đúng 1 test gate chính để pass/f
 | Field               | Value                                                  |
 | ------------------- | ------------------------------------------------------ |
 | **Test Case ID**    | TC-15.4                                                |
-| **Title**           | Mobile checks manifest version, triggers sync if newer |
+| **Title**           | Web client checks manifest version, triggers sync if newer |
 | **Precondition**    | Admin updates POI on server                            |
-| **Steps**           | 1. Mobile calls `/sync/manifest`                       |
-| **Expected Result** | ✅ Mobile detects version change, fetches full sync    |
+| **Steps**           | 1. Web client calls `/sync/manifest`                       |
+| **Expected Result** | ✅ Web client detects version change, fetches full sync    |
 | **Status**          | ⬜ Not Run                                             |
 
 ---
@@ -665,9 +665,9 @@ Rule: mỗi UC có đúng 1 AC chính và đúng 1 test gate chính để pass/f
 | Field               | Value                                                                                      |
 | ------------------- | ------------------------------------------------------------------------------------------ |
 | **Test Case ID**    | TC-16.1                                                                                    |
-| **Title**           | Admin creates new POI, audio generated, mobile syncs                                       |
-| **Steps**           | 1. Admin adds new POI via CMS → 2. Backend triggers TTS → 3. Audio saved → 4. Mobile syncs |
-| **Expected Result** | ✅ New POI appears on mobile map with audio playable                                       |
+| **Title**           | Admin creates new POI, audio generated, web client syncs                                       |
+| **Steps**           | 1. Admin adds new POI via CMS → 2. Backend triggers TTS → 3. Audio saved → 4. Web client syncs |
+| **Expected Result** | ✅ New POI appears on web map with audio playable                                       |
 | **Status**          | ⬜ Not Run                                                                                 |
 
 #### TC-16.2: Admin Edits POI Description
@@ -676,8 +676,8 @@ Rule: mỗi UC có đúng 1 AC chính và đúng 1 test gate chính để pass/f
 | ------------------- | ----------------------------------------------------------------- |
 | **Test Case ID**    | TC-16.2                                                           |
 | **Title**           | Admin edits POI text, new audio generated                         |
-| **Steps**           | 1. Admin edits description → 2. TTS regenerated → 3. Mobile syncs |
-| **Expected Result** | ✅ Mobile gets new audio, old version replaced                    |
+| **Steps**           | 1. Admin edits description → 2. TTS regenerated → 3. Web client syncs |
+| **Expected Result** | ✅ Web client gets new audio, old version replaced                    |
 | **Status**          | ⬜ Not Run                                                        |
 
 ---
@@ -748,6 +748,17 @@ Rule: mỗi UC có đúng 1 AC chính và đúng 1 test gate chính để pass/f
 | **Steps**           | 1. Send interaction event or heartbeat → 2. Query dashboard     |
 | **Expected Result** | ✅ User included in `active_5m`, excluded after > 5m inactivity |
 | **Status**          | ⬜ Not Run                                                      |
+
+#### TC-17.7: Map Click Simulates Position and Highlights Nearest POI
+
+| Field               | Value                                                                 |
+| ------------------- | --------------------------------------------------------------------- |
+| **Test Case ID**    | TC-17.7                                                               |
+| **Title**           | User clicks map to simulate position and nearest POI is highlighted   |
+| **Precondition**    | Multiple POIs visible on map within the current viewport              |
+| **Steps**           | 1. Click a point near several POIs → 2. Observe highlight behavior    |
+| **Expected Result** | ✅ Nearest POI gets enlarged anchor/highlight style, no audio auto-play |
+| **Status**          | ⬜ Not Run                                                            |
 
 ---
 
@@ -889,7 +900,7 @@ RECOMMENDATIONS:
 - [ ] Single Voice Rule (TC-3.2, TC-4.2)
 - [ ] Overlap visual-only and deterministic recommendation (TC-17.1, TC-17.2)
 - [ ] Language switching (TC-5.1, TC-5.2, TC-5.3)
-- [ ] Offline mode (TC-8.1, TC-8.2, TC-8.3)
+- [ ] Network unavailable mode (TC-8.1, TC-8.2, TC-8.3)
 - [ ] Performance (TC-13.1, TC-13.2, TC-13.3)
 - [ ] Backend integration (TC-15.1, TC-15.2)
 - [ ] Queue resilience and online dashboard semantics (TC-17.3 through TC-17.6)
