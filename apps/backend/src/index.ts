@@ -9,8 +9,10 @@ import swaggerUi from 'swagger-ui-express';
 import authRouter from './routes/api/auth';
 import syncRouter from './routes/api/sync';
 import adminRouter from './routes/api/admin';
+import partnerRouter from './routes/api/partner';
 import poisRouter from './routes/api/pois';
 import toursRouter from './routes/api/tours';
+import userRouter from './routes/api/userRouter';
 import analyticsRouter from './routes/api/analytics';
 import usersRouter from './routes/api/users';
 import searchRouter from './routes/api/search';
@@ -38,7 +40,7 @@ async function validateAuthRoleSchema(): Promise<void> {
   `;
 
   if (missing.length > 0) {
-    const columns = missing.map((item) => item.column_name).join(', ');
+    const columns = missing.map((item: any) => item.column_name).join(', ');
     throw new Error(`Thiếu cột bắt buộc trong bảng users: ${columns}. Hãy chạy migration mới nhất trước khi khởi động server.`);
   }
 }
@@ -63,6 +65,7 @@ app.use(cors());
 app.use(helmet());
 app.use(compression({ threshold: 0 }));
 app.use(express.json());
+app.use('/api/v1/users', userRouter);
 app.use('/audio', express.static(path.resolve(process.cwd(), 'public/audio')));
 app.get('/api-docs/swagger.json', (_req, res) => {
   return res.status(200).json(loadOpenApiSpec());
@@ -70,6 +73,7 @@ app.get('/api-docs/swagger.json', (_req, res) => {
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(undefined, { swaggerUrl: '/api-docs/swagger.json' }));
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/sync', syncRouter);
+app.use('/api/v1/partner', partnerRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/pois', poisRouter);
 app.use('/api/v1/tours', toursRouter);
