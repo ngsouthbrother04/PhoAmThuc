@@ -30,9 +30,30 @@ npm run db:setup
 ```bash
 npm run prisma:format
 npm run prisma:generate
+npm run prisma:doctor
+npm run prisma:studio
 npm run prisma:migrate:deploy
 npm run prisma:seed
 ```
+
+## Prisma Studio Troubleshooting
+
+- Use Node LTS (`20` or `22`). This backend pins Node via `.nvmrc` and `engines.node`.
+- Reinstall dependencies after switching Node version:
+
+```bash
+cd apps/backend
+npm ci
+npm run prisma:doctor
+```
+
+- If Studio UI shows `Unable to communicate with Prisma Client`, verify DB access and restart Studio:
+
+```bash
+npx prisma studio --schema prisma/schema.prisma --browser none --port 5555
+```
+
+- On Windows, ensure your `DATABASE_URL` host/port is reachable from your machine and not blocked by firewall/antivirus.
 
 ## Notes for Team
 
