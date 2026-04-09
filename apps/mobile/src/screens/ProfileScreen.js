@@ -80,22 +80,35 @@ export default function ProfileScreen({ navigation, route }) {
     }
   };
 
-  const loadData = async () => {
+const loadData = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await API.get("/auth/profile", {
-        headers: { Authorization: `Bearer ${token}` }
+      
+      // THỬ CẢ 2 ĐƯỜNG DẪN NẾU /auth/profile KHÔNG CHẠY
+      // Bạn hãy kiểm tra xem backend của bạn dùng cái nào nhé
+      const response = await API.get("/users/profile", { 
+        headers: { Authorization: `Bearer ${token}` } 
       });
 
-      if (response.data && response.data.data) {
-        const name = response.data.data.fullName || "Khách du lịch";
-        const mail = response.data.data.email || "";
+      console.log("DỮ LIỆU PROFILE:", response.data);
+
+      // Kiểm tra cấu trúc trả về (có thể là response.data hoặc response.data.data)
+      const userData = response.data.data || response.data;
+
+      if (userData) {
+        const name = userData.fullName || userData.name || "Khách du lịch";
+        const mail = userData.email || "";
+        
         setFullName(name);
         setEmail(mail);
+        
+        // Lưu lại để dùng lần sau
         await AsyncStorage.setItem('userName', name);
         await AsyncStorage.setItem('userEmail', mail);
       }
     } catch (e) {
+      console.log("Lỗi tải API, đang lấy từ bộ nhớ tạm...");
+      // PHƯƠNG ÁN DỰ PHÒNG: Lấy từ AsyncStorage nếu API lỗi
       const sName = await AsyncStorage.getItem('userName');
       const sEmail = await AsyncStorage.getItem('userEmail');
       if (sName) setFullName(sName);
@@ -156,7 +169,7 @@ export default function ProfileScreen({ navigation, route }) {
               {fullName ? fullName.charAt(0).toUpperCase() : 'U'}
             </Text>
           </View>
-          <Text style={styles.headerEmail}>{email || labels.loadingText}</Text>
+          <Text style={styles.headerEmail}>{fullName || labels.loadingText}</Text>
         </View>
 
         <View style={styles.form}>

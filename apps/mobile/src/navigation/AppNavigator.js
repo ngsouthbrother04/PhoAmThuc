@@ -41,7 +41,13 @@ export default function AppNavigator() {
         <Stack.Screen 
           name="Home" 
           component={HomeScreen} 
-          options={{ title: "🏠 Trang chủ" }} 
+          options={{ 
+            title: "🏠 Trang chủ",
+            headerStyle: {
+              backgroundColor: "#fff",
+              height: 80, 
+            },
+          }} 
         />
         {/* 4.Màn hình Profile: Cho phép người dùng xem và chỉnh sửa thông tin cá nhân */}
         <Stack.Screen 

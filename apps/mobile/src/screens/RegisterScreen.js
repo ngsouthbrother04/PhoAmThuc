@@ -72,7 +72,7 @@ export default function RegisterScreen({ navigation }) {
           />
         </View>
 
-        <View style={styles.inputContainer}>
+        {/* <View style={styles.inputContainer}>
           <Text style={styles.label}>Mã kích hoạt (Claim Code)</Text>
           <TextInput
             placeholder="Nhập mã ưu đãi của bạn..."
@@ -82,7 +82,7 @@ export default function RegisterScreen({ navigation }) {
             autoCapitalize="characters" // Tự viết hoa cho mã code
           />
           <Text style={styles.hintText}>* Mã này giúp bạn mở khóa các tour ẩm thực đặc biệt.</Text>
-        </View>
+        </View> */}
 
         <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
           <Text style={styles.registerButtonText}>Hoàn Tất Đăng Ký</Text>
