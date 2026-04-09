@@ -4,6 +4,7 @@ import { PaymentProvider } from '../../generated/prisma/client';
 import {
   registerUser,
   loginUser,
+  changeUserPassword,
   redeemClaimCode,
   finalizePayment,
   initiatePayment,
@@ -105,6 +106,65 @@ router.post(
     return res.status(200).json({
       message: 'Đăng nhập thành công.',
       ...authData
+    });
+  })
+);
+
+/**
+ * POST /api/v1/auth/change-password
+ * @summary Change current user password
+ * @description Verify current password and update to a new password.
+ * @tags Auth
+ * @security bearerAuth
+ * @param {object} request.body.required - Change password payload
+ * @param {string} request.body.currentPassword.required - Current password
+ * @param {string} request.body.newPassword.required - New password
+ * @return {object} 200 - Password changed successfully
+ * @return {object} 400 - Invalid payload or current password mismatch
+ * @return {object} 401 - Unauthorized
+ */
+router.post(
+  '/change-password',
+  requireAuth,
+  asyncHandler(async (req: AuthRequest, res) => {
+    const userId = req.user?.sub;
+    const currentPassword = typeof req.body?.currentPassword === 'string' ? req.body.currentPassword : '';
+    const newPassword = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
+
+    if (!userId) {
+      throw new ApiError(401, 'Unauthorized');
+    }
+
+    if (!currentPassword || !newPassword) {
+      throw new ApiError(400, 'Thiếu currentPassword hoặc newPassword.');
+    }
+
+    try {
+      await changeUserPassword({
+        userId,
+        currentPassword,
+        newPassword
+      });
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'UNKNOWN';
+
+      if (code === 'INVALID_CURRENT_PASSWORD') {
+        throw new ApiError(400, 'Mật khẩu hiện tại không đúng.');
+      }
+
+      if (code === 'PASSWORD_TOO_SHORT') {
+        throw new ApiError(400, 'Mật khẩu mới phải có ít nhất 6 ký tự.');
+      }
+
+      if (code === 'INVALID_PASSWORD_PAYLOAD') {
+        throw new ApiError(400, 'Dữ liệu đổi mật khẩu không hợp lệ.');
+      }
+
+      throw error;
+    }
+
+    return res.status(200).json({
+      message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.'
     });
   })
 );

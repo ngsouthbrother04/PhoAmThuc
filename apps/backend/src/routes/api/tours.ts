@@ -3,8 +3,19 @@ import { getPublicTours, getPublicTourById } from '../../services/tourPublicServ
 import { isUserPremium } from '../../services/authService';
 import { requireAuth, AuthRequest } from '../../middlewares/authMiddleware';
 import asyncHandler from '../../utils/asyncHandler';
+import ApiError from '../../utils/ApiError';
+import { getFeaturedTours } from '../../services/publicContentService';
 
 const router = Router();
+
+function requireUserId(req: AuthRequest): string {
+  const userId = req.user?.sub;
+  if (!userId) {
+    throw new ApiError(401, 'Token rỗng hoặc không hợp lệ.');
+  }
+
+  return userId;
+}
 
 /**
  * GET /api/v1/tours
@@ -21,7 +32,8 @@ router.get(
   '/',
   requireAuth,
   asyncHandler(async (req: AuthRequest, res) => {
-    const isPremium = await isUserPremium(req.user?.sub);
+    const userId = requireUserId(req);
+    const isPremium = await isUserPremium(userId);
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
 
@@ -48,10 +60,36 @@ router.get(
   '/:id',
   requireAuth,
   asyncHandler(async (req: AuthRequest, res) => {
-    const isPremium = await isUserPremium(req.user?.sub);
+    const userId = requireUserId(req);
+    const isPremium = await isUserPremium(userId);
     const id = String(req.params.id);
 
     const data = await getPublicTourById(id, isPremium);
+    return res.status(200).json({
+      status: 'success',
+      data
+    });
+  })
+);
+
+/**
+ * GET /api/v1/tours/featured
+ * @summary Get featured tours
+ * @description Retrieve recently published or recommended tours for homepage showcase
+ * @tags Tours
+ * @security bearerAuth
+ * @param {number} limit.query - Max items (default: 4, max: 12)
+ * @return {object} 200 - Featured tours list
+ * @return {object} 401 - Unauthorized
+ * @return {object} 500 - Internal Server Error
+ */
+router.get(
+  '/featured',
+  asyncHandler(async (req: AuthRequest, res) => {
+    const isPremium = false;
+    const limit = Math.min(parseInt(req.query.limit as string) || 4, 12);
+
+    const data = await getFeaturedTours(limit, isPremium);
     return res.status(200).json({
       status: 'success',
       data

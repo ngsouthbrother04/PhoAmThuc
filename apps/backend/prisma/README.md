@@ -11,7 +11,7 @@ This folder defines the canonical database baseline for Backend Core (DB-01).
 ## Stable Conventions
 
 - `PoiType` uses stable keys: `FOOD`, `DRINK`, `SNACK`, `WC`.
-- UI localization for type labels must be handled in API/mobile mapping, not by changing DB enum values.
+- UI localization for type labels must be handled in API/web mapping, not by changing DB enum values.
 - Tour duration is represented by Prisma field `duration`, mapped to DB column `estimated_time`.
 - Content publication uses integer `content_version` on both `points_of_interest` and `tours`.
 

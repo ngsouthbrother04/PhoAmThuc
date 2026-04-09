@@ -25,7 +25,7 @@
 5. **UC5** – Switch Language & Settings
 6. **UC6** – Control Audio Playback (Pause/Resume/Stop)
 7. **UC7** – View Food Tour & Exploration
-8. **UC8** – Offline Content Access
+8. **UC8** – Network Required Content Access
 
 ---
 
@@ -35,12 +35,12 @@
 **Maturity**: Focused  
 **Priority**: Critical  
 
-Visitor accesses the mobile application after authenticating via email and password (Log In or Sign Up), and the system syncs offline content to the mobile device.
+Visitor accesses the web application after authenticating via email and password (Log In or Sign Up), and the system loads content from the backend.
 
 ---
 
 ### Preconditions
-- Mobile app is installed on device
+- Web app is opened in a modern browser
 - Internet connection available (for initial sync)
 - Device has sufficient storage (>100MB)
 
@@ -58,19 +58,19 @@ Visitor accesses the mobile application after authenticating via email and passw
 | 3b | **Path B: Login** | | |
 | 3b1 | Enters email & password | System validates credentials | POST `/api/v1/auth/login` |
 | 3b2 | | Credentials valid | Returns JWT token + user session |
-| 4 | | **CRITICAL**: Sync offline content | GET `/api/v1/sync/manifest` → GET `/api/v1/sync/full` |
-| 5 | | Downloads POI data + audio files | Atomic write to SQLite + expo-file-system |
-| 6 | | Displays map with all POI markers | Shows cached data ready for exploration |
+| 4 | | **CRITICAL**: Load content from API | GET `/api/v1/pois?language=...` → GET `/api/v1/tours` |
+| 5 | | Receives POI data + audio URLs | Render from API response |
+| 6 | | Displays map with all POI markers | Shows live data ready for exploration |
 | 7 | User sees map screen | System ready for exploration | Auth state: AUTHORIZED |
 | 8 | User continues session | Refreshes token or logout when needed | POST `/api/v1/auth/token-refresh`, POST `/api/v1/auth/logout` |
 
 ---
 
 ### Postconditions
-- User is authenticated (JWT token stored in secure storage)
-- All POI data synced locally to SQLite
-- All audio MP3 files cached to device
-- User can explore offline
+- User is authenticated (JWT token stored in browser storage)
+- All POI data loaded from API responses
+- Audio MP3 files are fetched when needed
+- User can explore while connected
 
 ---
 
@@ -104,15 +104,15 @@ Visitor accesses the mobile application after authenticating via email and passw
 |----------|----------|
 | User closes app during sync | Sync resume on next app launch (delta sync) |
 | Storage full (no space for audio) | Show warning: "Lưu trữ thiết bị gần đầy" |
-| Corrupted SQLite database | Wipe & re-sync from server |
-| Token expired while offline | Re-authenticate when online |
+| Corrupted local browser store | Wipe & re-sync from server |
+| Token expired | Re-authenticate when online |
 | Server version newer, but no internet | Show last cached version, prompt to reconnect |
 
 ---
 
 ### Related Use Cases
 - UC2 – Explore Map
-- UC8 – Offline Content Access
+- UC8 – Network Required Content Access
 
 ---
 
@@ -129,7 +129,7 @@ After authorization, user explores the map view with POI markers representing fo
 
 ### Preconditions
 - User is authenticated (UC1 completed)
-- Offline data synced to SQLite
+- Content loaded from API
 - Location permission granted
 - Map is displayed
 
@@ -139,13 +139,14 @@ After authorization, user explores the map view with POI markers representing fo
 
 | Step | Actor | System | Technical Details |
 |------|-------|--------|-------------------|
-| 1 | Views map screen | Renders all POI markers | `react-native-maps` + SQLite query |
+| 1 | Views map screen | Renders all POI markers | Leaflet + API query |
 | 2 | Moves/scrolls map | Map updates visible markers | Viewport change listener |
-| 3 | User location updates | Shows blue dot on map | `expo-location` foreground tracking |
+| 3 | User location updates | Shows blue dot on map | Browser geolocation foreground tracking |
 | 4 | Location near POI (visual highlight) | Nearby POIs highlighted/animated | UI enhancement (NOT auto-play) |
+| 4a | User clicks map to simulate position | Nearest POI is highlighted with an enlarged anchor style | UI enhancement (NOT auto-play) |
 | 5 | Taps a POI marker | Bottom sheet opens | `onMarkerPress` event |
 | 6 | | Displays POI details in bottom sheet: | |
-| | | - POI name (current language) | Text from SQLite |
+| | | - POI name (current language) | Text from API |
 | | | - Description snippet | JSONB → current lang |
 | | | - Main image | Image URL from cache |
 | | | - "Nghe thuyết minh" (Listen) button | Audio playback button |
@@ -220,8 +221,8 @@ User taps "Nghe thuyết minh" (Listen) button in POI details to play pre-record
 | 1 | Views POI details in bottom sheet | System in IDLE state | audioState = IDLE |
 | 2 | Taps "Nghe thuyết minh" button | Dispatch PLAY_EVENT | audioDispatch({ type: 'PLAY_EVENT', poiId }) |
 | 3 | | Check if audio already playing | if (currentAudio.poiId !== newPoiId) { stop() } |
-| 4 | | Load audio file from local cache | `expo-file-system.readAsStringAsync(audioPath)` |
-| 5 | | Start playback | `expo-av.Sound.createAsync()` + `.playAsync()` |
+| 4 | | Load audio file from local cache | Browser cache / local URL |
+| 5 | | Start playback | `new Audio(audioUrl)` + `.play()` |
 | 6 | | **Transition State → PLAYING** | audioState = PLAYING |
 | 7 | | Display mini player (pause/stop controls) | Mini player UI appears |
 | 8 | | Audio plays (narration) | TTS audio plays for 30-60 seconds |
@@ -262,7 +263,7 @@ User taps "Nghe thuyết minh" (Listen) button in POI details to play pre-record
 | Scenario | Behavior |
 |----------|----------|
 | Audio file corrupted / missing | Show error: "Không thể phát âm thanh" |
-| Network disconnected (offline) | Play from file cache (already synced) |
+| Network disconnected | Show retry / unavailable message |
 | Device volume = 0 | Audio plays silently (expected) |
 | User locks screen during playback | Audio continues in background / stops if policy set |
 | Low battery mode | Audio plays normally (no optimization needed) |
@@ -299,9 +300,9 @@ User scans a QR code (physical sticker at food stall) to directly trigger audio 
 | Step | Actor | System | Technical Details |
 |------|-------|--------|-------------------|
 | 1 | Taps "Scan QR" button in app | Opens camera view | Navigation to QR scanner screen |
-| 2 | Points camera at QR sticker | Camera stream active | `expo-camera` or `expo-barcode-scanner` |
+| 2 | Points camera at QR sticker | Camera stream active | Browser camera / QR scanner library |
 | 3 | QR code scanned | System decodes QR data | Read POI ID from QR: "poi_001" |
-| 4 | | Lookup POI in SQLite | `select * from pois where id = "poi_001"` |
+| 4 | | Lookup POI via API | `GET /api/v1/pois/poi_001?language=vi` |
 | 5 | | **Dispatch PLAY_EVENT** (same as UC3) | Same State Machine logic |
 | 6 | | **Apply Single Voice Rule** | Stop any playing audio first |
 | 7 | | Navigate to POI narration + play | Show bottom sheet + start audio |
@@ -323,7 +324,7 @@ User scans a QR code (physical sticker at food stall) to directly trigger audio 
 - Show error: "Mã QR không hợp lệ"
 
 **A2: POI Not Found in Local Database**
-- POI ID doesn't exist in SQLite
+- POI ID doesn't exist in backend response
 - Show error: "Địa điểm không tồn tại"
 - Suggest manual sync
 
@@ -370,8 +371,8 @@ User accesses Settings screen to change preferred language. When language is cha
 | 1 | Opens Settings screen | Shows language selector dropdown | UI navigation |
 | 2 | Current language highlighted (e.g., "Tiếng Việt") | Displays all available languages | List: VI, EN, KO, JA, FR, DE, ES, PT, RU, ZH, TH, ID, HI, AR, TR |
 | 3 | Selects new language (e.g., "한국어") | System checks user tier (Freemium vs Premium) | Account tier verification |
-| 4 | | User is Premium: Updates preference state | `zustand` store update + `SecureStore` save |
-| 5 | | Re-queries SQLite with new language | Fetch all POIs filtered by new language |
+| 4 | | User is Premium: Updates preference state | `zustand` store update + `localStorage` save |
+| 5 | | Re-queries API with new language | Fetch all POIs filtered by new language |
 | 6 | | Updates map display (names, descriptions) | Re-render POI popup text |
 | 7 | | Downloads new audio URLs if not cached | Check backend local static for MP3s |
 | 8 | User sees all content in new language | New language active | UI refreshed |
@@ -395,9 +396,9 @@ User accesses Settings screen to change preferred language. When language is cha
 - Auto-download MP3s in background from backend local static path
 - Once complete, language ready to use
 
-**A2: Network Offline, Language Audio Missing**
-- Fallback to Vietnamese or English (cached version)
-- Show note: "Âm thanh tiếng này chưa sẵn sàng offline"
+**A2: Network Unavailable, Language Audio Missing**
+- Fallback to Vietnamese or English when available
+- Show note: "Âm thanh tiếng này chưa sẵn sàng"
 
 **A3: Freemium User Selects Premium Language**
 - User with Freemium tier selects a language other than Tiếng Việt (VI) or Tiếng Anh (EN).
@@ -444,11 +445,11 @@ User controls audio playback via mini player controls: Pause, Resume, Stop.
 | Step | Actor | Action | System Response | State |
 |------|-------|--------|-----------------|-------|
 | 1 | Audio playing | (Initial) | | PLAYING |
-| 2 | Taps **Pause** button | Pause pressed | Call `expo-av.pause()` | **→ PAUSED** |
+| 2 | Taps **Pause** button | Pause pressed | Call `audio.pause()` | **→ PAUSED** |
 | 3 | | Playback halted at current position | Mini player shows Resume button | PAUSED |
-| 4 | Taps **Resume** button | Resume pressed | Call `expo-av.playAsync()` | **→ PLAYING** |
+| 4 | Taps **Resume** button | Resume pressed | Call `audio.play()` | **→ PLAYING** |
 | 5 | | Playback continues from paused position | Mini player shows Pause button | PLAYING |
-| 6 | Taps **Stop** button | Stop pressed | Call `expo-av.stopAsync()` | **→ IDLE** |
+| 6 | Taps **Stop** button | Stop pressed | Call `audio.pause(); audio.currentTime = 0` | **→ IDLE** |
 | 7 | | Playback stops, mini player closes | Map/bottom sheet still visible | IDLE |
 
 ---
@@ -514,7 +515,7 @@ User selects a predefined food tour (e.g., "Ăn vặt Sinh viên") to explore mu
 
 ### Preconditions
 - User authenticated & at map screen
-- Tours loaded in SQLite
+- Tours loaded from API
 - At least 1 tour exists
 
 ---
@@ -524,7 +525,7 @@ User selects a predefined food tour (e.g., "Ăn vặt Sinh viên") to explore mu
 | Step | Actor | System | Technical Details |
 |------|-------|--------|-------------------|
 | 1 | Taps "Tours" tab / menu | Shows list of available tours | UI list of all tours |
-| 2 | | Displays: Tour name, image, POI count, duration | From SQLite tours table |
+| 2 | | Displays: Tour name, image, POI count, duration | From API response |
 | 3 | Taps a tour (e.g., "Ăn vặt Sinh viên") | System filters map | tour.poi_ids = ["poi_001", "poi_003", "poi_005"] |
 | 4 | | Shows only tour POIs on map with numbers | Markers labeled 1, 2, 3, ... in order |
 | 5 | | Highlights tour info (duration, description) | Bottom banner shows tour details |
@@ -572,21 +573,21 @@ User selects a predefined food tour (e.g., "Ăn vặt Sinh viên") to explore mu
 
 ---
 
-## UC8 – Offline Content Access
+## UC8 – Network Required Content Access
 
 **Actor**: Foodie  
 **Maturity**: Focused  
 **Priority**: Medium  
 
 ### Summary
-User can explore map, view POI details, and listen to narrations even without internet connectivity. All content is sourced from local SQLite and cached MP3 files (synced earlier).
+User can explore map, view POI details, and listen to narrations while connected to the network. All content is sourced from backend API responses and fetched MP3 URLs.
 
 ---
 
 ### Preconditions
-- Initial sync completed (UC1)
-- SQLite + audio MP3s cached locally
-- Internet now disconnected (WiFi/4G off)
+- User is authenticated (UC1)
+- Backend API is reachable
+- Browser location permission granted if map position is used
 
 ---
 
@@ -594,55 +595,46 @@ User can explore map, view POI details, and listen to narrations even without in
 
 | Step | Actor | System | Source |
 |------|-------|--------|--------|
-| 1 | User closes app (with internet) | Content synced to SQLite | Server → SQLite |
-| 2 | Turns off WiFi/4G | Internet unavailable | |
-| 3 | Opens app again | App starts in offline mode | |
-| 4 | Views map | Map loads (may show basic map tiles if cached) | SQLite query |
-| 5 | Sees all POI markers | Markers rendered from SQLite | pois table (local) |
-| 6 | Taps POI | Bottom sheet shows details | SQLite: name, description, image_url |
-| 7 | Taps "Listen" | Audio plays from local file | expo-file-system MP3 + expo-av |
-| 8 | | No API call, data entirely local | Offline-first architecture |
-| 9 | User completes exploration | Full functionality without internet | |
+| 1 | User opens app | Content loads from server | Server → API response |
+| 2 | Views map | Map loads and markers render | Leaflet + API query |
+| 3 | Sees all POI markers | Markers rendered from API data | pois response |
+| 4 | Taps POI | Bottom sheet shows details | API: name, description, image_url |
+| 5 | Taps "Listen" | Audio plays from fetched MP3 URL | HTMLAudioElement |
+| 6 | | API calls remain available during use | Online-first architecture |
+| 7 | User completes exploration | Full functionality while connected | |
 
 ---
 
 ### Postconditions
-- User successfully explored offline
-- Analytics events buffered locally (will sync when online)
-- When internet returns, app syncs analytics and checks updates using manifest -> incremental sync -> full sync fallback
+- User successfully explored while connected
+- Analytics events are sent according to backend policy
+- App remains responsive to transient network failures
 
 ---
 
 ### Alternative Paths
 
-**A1: User Tries to Sync While Offline**
-- Sync request queued / deferred
+**A1: User Tries to Refresh While Network Is Unavailable**
+- Show retry / network unavailable message
 - Does not fail hard (graceful degradation)
-- Syncs automatically when connection restored
+- Refreshes automatically when connection restored
 
-**A3: Incremental Sync Not Applicable**
-- Client reconnects and sends incremental sync request
-- Server responds delta window exceeded / requires full sync
-- Client falls back to GET full sync and applies atomic replace
-
-**A2: Storage Full (SQLite or MP3 cache)**
+**A2: Storage Full (Browser Cache or Downloaded Audio)**
 - Show warning about storage
-- User can delete old cache & re-sync
-
----
+- User can clear browser data and reload content
 
 ### Edge Cases
 
 | Scenario | Behavior |
 |----------|----------|
-| POI edited on server, but not re-synced | User sees old cached content (eventually syncs) |
-| New tour added, but no offline sync | Old tours still available offline |
-| App update while offline | Uses current offline data, updates on next sync |
+| POI edited on server, but current session has old data | User sees current session data until refresh |
+| New tour added after page load | Appears on next refresh |
+| App update while disconnected | Uses current loaded data, updates on next refresh |
 
 ---
 
 ### Related Use Cases
-- UC1 – Authorization & Initial Sync (prerequisite)
+- UC1 – Authorization & Initial Load (prerequisite)
 - UC2 – Map Exploration
 - UC3 – Narration Playback
 
@@ -659,14 +651,14 @@ User can explore map, view POI details, and listen to narrations even without in
 | UC5 | Switch Language | Foodie | Open Settings | Language changed, text/audio updated |
 | UC6 | Control Audio | Foodie | Tap Pause/Resume/Stop | Audio paused/resumed/stopped |
 | UC7 | View Tour | Foodie | Select tour | Ordered POI exploration |
-| UC8 | Offline Access | Foodie | Disconnect internet | Content accessible locally |
+| UC8 | Network Required Content Access | Foodie | Open app online | Content accessible from API |
 
 ---
 
 ## Actor Definition
 
 **Foodie (Primary Actor)**
-- Person using mobile app
+- Person using web app
 - May or may not have internet
 - Speaks multiple languages
 - Wants to discover food culture via narration
@@ -677,7 +669,7 @@ User can explore map, view POI details, and listen to narrations even without in
 ## System Boundary
 
 The system includes:
-- ✅ Mobile app (React Native)
+- ✅ Web app (React + TypeScript)
 - ✅ Backend API (Node.js)
 - ✅ PostgreSQL database
 - ✅ Local file storage
@@ -691,10 +683,10 @@ The system includes:
 ### Analytics
 All major actions logged:
 - PLAY, PAUSE, STOP, QR_SCAN
-- Logged to SQLite, then batch uploaded
+- Sent to analytics API with retry policy
 
-### Offline-First
-SQLite + file cache ensures functionality without internet
+### Online-First
+API responses and browser state drive functionality during use
 
 ### Single Voice Rule
 Only valid for UC3 & UC4 (audio playback)

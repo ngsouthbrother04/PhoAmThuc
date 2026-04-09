@@ -16,11 +16,11 @@
 └─────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────┐              ┌──────────────────────┐
-│   ADMIN CMS/WEB      │              │   MOBILE APP         │
-│  (React)             │              │  (Expo/React Native) │
+│   ADMIN CMS/WEB      │              │   WEB APP            │
+│  (React)             │              │  (React/Vite)        │
 │  - POI Management    │              │  - Tap-to-Play       │
 │  - Content Edition   │              │  - Map Exploration   │
-│  - Audio Generation  │              │  - Offline Sync      │
+│  - Audio Generation  │              │  - API Content Load   │
 └──────────┬───────────┘              └──────────┬───────────┘
            │                                     │
            └──────────┬────────────────────────┬─┘
@@ -43,20 +43,20 @@
         └──────────────┬─────────────────────┐
                        ▼
                 ┌──────────────┐
-                │ Mobile SQLite│
-                │ (Offline)    │
+                │ Browser Data │
+                │ (Runtime)    │
                 └──────────────┘
 ```
 
 **Thành phần chính**:
 
-- **Mobile App**: React Native (Expo) - Front-end khám phá POI
+- **Web App**: React 18 + Vite - Front-end khám phá POI
 - **Backend API**: Node.js 20+ + Express + TypeScript
 - **Database chính**: PostgreSQL (with PostGIS extension)
 - **Cache**: Redis
 - **Storage**: Audio local filesystem + Image Cloudinary
-- **Text-to-Speech**: Piper (offline, free, no account)
-- **Database Offline**: SQLite (trên Mobile)
+- **Text-to-Speech**: Piper (self-hosted, free, no account)
+- **Browser Storage**: browser storage for runtime preferences
 
 ---
 
@@ -112,31 +112,29 @@ Language selection (canonical): query param `?language=vi`
 
 ---
 
-#### **B. Synchronization (Offline-First)**
+#### **B. Content Delivery (API-First)**
 
 | Endpoint            | Method | Mục đích                       | Auth |
 | ------------------- | ------ | ------------------------------ | ---- |
-| `/sync/manifest`    | GET    | Lấy thông tin version hiện tại | ✅   |
-| `/sync/full`        | GET    | Tải toàn bộ POI & Tour data    | ✅   |
-| `/sync/incremental` | POST   | Cập nhật theo version delta    | ✅   |
+| `/pois`             | GET    | Lấy POI theo ngôn ngữ          | ✅   |
+| `/tours`            | GET    | Lấy danh sách tour             | ✅   |
+| `/pois/{id}`        | GET    | Lấy chi tiết POI               | ✅   |
 
 **Request/Response ví dụ**:
 
 ```json
-// GET /sync/manifest
+// GET /pois?language=vi
 // Response 200
 {
   "status": "success",
   "data": {
-    "serverVersion": 3,
-    "dataChecksum": "abc123def456",
-    "lastUpdated": "2026-03-24T15:30:00Z",
-    "requiresFullSync": false,
-    "mediaBasePath": "/audio/"
+    "items": [],
+    "language": "vi",
+    "lastUpdated": "2026-03-24T15:30:00Z"
   }
 }
 
-// GET /sync/full (supports language param)
+// GET /tours
 // Response 200
 {
   "status": "success",
@@ -474,7 +472,7 @@ Ghi chú triển khai đồ án:
 - Logout đánh dấu access token hiện tại là không hợp lệ trong runtime process (in-memory invalidation).
 - Mục tiêu là rõ ràng hành vi cho scope môn học, không tối ưu phân tán nhiều instance.
 
-#### B. Synchronization (Offline-First)
+#### B. Content Delivery (API-First)
 
 **GET `/sync/manifest`**
 
@@ -936,7 +934,7 @@ Ghi chú triển khai đồ án:
 **Yêu cầu**:
 
 - Hỗ trợ 15 ngôn ngữ
-- Backend: Server-side TTS generation (không trên mobile)
+- Backend: Server-side TTS generation (không trên client)
 - Storage: MP3 files lưu trên local filesystem
 
 **Flow**:
@@ -949,26 +947,26 @@ Backend receives content update
 Trigger Background Job (BullMQ / Node-schedule)
   ↓
 For each language:
-  - Call Piper offline TTS engine
+  - Call Piper TTS engine
   - Generate MP3 file
   - Save to local filesystem (`/audio/...`)
   ↓
 Database: Save audio URLs to audioUrls JSON field
   ↓
-Sync manifest updates (version++)
+Content version updates (version++)
   ↓
-Mobile clients auto-sync and download MP3 files
+Web clients fetch updated content when needed
   ↓
-Mobile plays from local cache (offline-first)
+Web plays fetched MP3 URLs directly
 ```
 
 ### 3.2 Công nghệ TTS Đề xuất
 
 | Công nghệ               | Miễn phí           | Chất lượng | Dễ sử dụng | Ghi chú                               |
 | ----------------------- | ------------------ | ---------- | ---------- | ------------------------------------- |
-| **Piper** (Open-source) | Hoàn toàn miễn phí | ⭐⭐⭐⭐   | ⭐⭐⭐⭐   | Offline, self-host, không cần account |
+| **Piper** (Open-source) | Hoàn toàn miễn phí | ⭐⭐⭐⭐   | ⭐⭐⭐⭐   | Self-host, không cần account |
 
-**Đề xuất cho đồ án**: Piper (offline, free, no account) cho toàn bộ môi trường dev/prod.
+**Đề xuất cho đồ án**: Piper (self-hosted, free, no account) cho toàn bộ môi trường dev/prod.
 
 ### 3.3 Queue Contract cho Scale Nhiều User/POI
 
@@ -1037,12 +1035,12 @@ const getPOI = (poiId: string, language: string) => {
 };
 ```
 
-### 4.3 Mobile-side Language Switching
+### 4.3 Web-side Language Switching
 
-Mobile app sẽ:
+Web app sẽ:
 
 1. Lưu user's language preference trong `zustand` store
-2. Khi lấy POI từ SQLite, lọc theo language
+2. Khi lấy POI từ API, lọc theo language query param
 3. Khi submit analytics, ghi lại language được dùng
 
 ---
@@ -1060,7 +1058,7 @@ Theo SPEC_CANONICAL.md:
 ### 5.2 Implementation
 
 ```typescript
-// Mobile-side: Location tracking
+// Web-side: Location tracking
 const trackLocation = async () => {
   const location = await Location.getCurrentPositionAsync({});
 
@@ -1121,10 +1119,10 @@ Key: sync:manifest     → Current version info
 TTL: 24 hours (content), 1 hour (dynamic data)
 ```
 
-### 6.2 Client-side Caching
+### 6.2 Client-side State
 
-- SQLite: Full content mirror (offline-first)
-- File system: MP3 downloads via `expo-file-system`
+- Browser storage: runtime preferences and auth/session state
+- Browser fetch: MP3 downloads on demand
 - In-memory: zustand state (current tour, active POI)
 
 ---
@@ -1172,12 +1170,12 @@ jobs:
 - ✅ JWT tokens cho API access
 - ✅ Rate limiting (prevent brute-force auth attempts)
 - ✅ HTTPS/TLS cho all API calls
-- ✅ Secure storage của token trên Mobile (`SecureStore`)
+- ✅ Secure storage của token trên Web (`localStorage` hoặc `sessionStorage`)
 
 ### 8.2 Data Protection
 
 - ✅ Database encryption at-rest
-- ✅ CORS policy để chỉ allow mobile app domain
+- ✅ CORS policy để chỉ allow web app domain
 - ✅ Input validation trên tất cả endpoints
 - ✅ SQL injection prevention (Prisma auto-escape)
 
@@ -1186,7 +1184,7 @@ jobs:
 - ✅ Log tất cả admin actions
 - ✅ Analytics data anonymization (remove PII)
 - ✅ Regular security audit
-- ✅ Soft delete policy: record stays hidden from sync/mobile immediately, then cleanup job may remove physical media after retention window.
+- ✅ Soft delete policy: record stays hidden from API clients immediately, then cleanup job may remove physical media after retention window.
 - ✅ Audit trail must record actor, action, timestamp, and reason for POI delete/publish changes.
 - ✅ Retention/cleanup owner: backend maintains policy; product/admin defines retention window and audit requirements.
 

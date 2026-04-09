@@ -7,7 +7,7 @@
 ## 1. UX Principles
 
 1. Interaction-first: narration starts only after explicit tap or QR scan.
-2. Exploration-first: map and POI detail access must remain available offline.
+2. Exploration-first: map and POI detail access must remain available while connected.
 3. Clarity-first: playback state is always visible and controllable.
 
 ## 2. Navigation Structure
@@ -18,10 +18,11 @@
 
 ## 3. Map and POI UX
 
-1. Map shows POIs from local SQLite.
+1. Map shows POIs from backend data.
 2. Marker tap opens bottom sheet with image, text, and Listen action.
 3. Blue dot indicates user position in foreground mode only.
 4. Nearby highlight is visual-only and does not trigger playback.
+5. Clicking on the map can simulate a user position for testing; the nearest POI is highlighted with a larger anchor/marker style, but audio still requires explicit Listen or QR.
 
 ## 4. Playback UX
 
@@ -35,8 +36,8 @@
 2. UI and content update consistently after language switch.
 3. Content fallback is data-level fallback (requested, English, Vietnamese).
 
-## 6. Offline and Error States
+## 6. Network and Error States
 
-1. If network is unavailable and cache exists, app continues in offline mode.
-2. If network is unavailable and no cache exists, app requests retry sync.
+1. If network is unavailable, app shows retry / unavailable state.
+2. If content fetch fails, app retries gracefully and preserves current UI state.
 3. Invalid QR and missing POI show user-safe error without crash.

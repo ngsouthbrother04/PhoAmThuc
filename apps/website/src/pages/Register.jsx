@@ -1,7 +1,8 @@
+
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { authAPI } from "../lib/api";
 import AnimatedBackground from "../components/AnimatedBackground";
-
 export default function Register() {
   const [formData, setFormData] = useState({
     email: "",
@@ -36,6 +37,7 @@ export default function Register() {
     return null;
   };
 
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -47,35 +49,26 @@ export default function Register() {
     }
 
     setIsLoading(true);
-
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch("/api/v1/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
-      });
+      const data = await authAPI.register(
+        formData.email,
+        formData.password,
+        formData.email.split("@")[0]
+      );
 
-      if (!response.ok) {
-        throw new Error("Registration failed");
+      if (data.accessToken) {
+        localStorage.setItem("accessToken", data.accessToken);
+        localStorage.setItem("refreshToken", data.refreshToken);
+        navigate("/");
+      } else {
+        setError(data.message || "Registration failed");
       }
-
-      const data = await response.json();
-      // TODO: Store token in localStorage or secure storage
-      localStorage.setItem("token", data.token);
-      navigate("/");
     } catch (err) {
       setError(err.message || "An error occurred during registration");
     } finally {
       setIsLoading(false);
     }
   };
-
   return (
     <div className="relative w-full min-h-full overflow-hidden">
       <AnimatedBackground />

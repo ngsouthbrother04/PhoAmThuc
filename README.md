@@ -10,10 +10,11 @@
 ## Quick Navigation
 
 **For different audiences**, start here:
+
 - **👨‍💼 Product Managers**: Đọc [`SPEC_CANONICAL.md`](./SPEC_CANONICAL.md) §1-2 → [`docs/prd/`](./docs/prd/)
 - **🏗️ Architects**: Đọc [`ARCHITECTURE.md`](./ARCHITECTURE.md) → [`SPEC_CANONICAL.md`](./SPEC_CANONICAL.md) §11 (conflict resolution)
 - **💻 Backend Developers**: [`docs/backend_design.md`](./docs/backend_design.md) + [`docs/database_design.md`](./docs/database_design.md) + [`AI_GUIDELINES.md`](./AI_GUIDELINES.md)
-- **📱 Mobile Developers**: [`ARCHITECTURE.md`](./ARCHITECTURE.md) §2-7 + [`USE_CASES.md`](./USE_CASES.md) + [`AI_GUIDELINES.md`](./AI_GUIDELINES.md)
+- **🌐 Frontend Developers**: [`ARCHITECTURE.md`](./ARCHITECTURE.md) §2-7 + [`USE_CASES.md`](./USE_CASES.md) + [`AI_GUIDELINES.md`](./AI_GUIDELINES.md)
 - **🧪 QA / Testing**: [`docs/test_scenarios.md`](./docs/test_scenarios.md) + [`USE_CASES.md`](./USE_CASES.md)
 - **🤖 AI Agents**: Read **[`TEAM_START_HERE.md`](./TEAM_START_HERE.md)** first (mandatory)
 
@@ -25,7 +26,7 @@
 
 ### Core Principle (Nguyên tắc Cốt Lõi)
 
-> **User-Triggered Audio Only**: No auto-play. Narration activates ONLY via explicit user interaction (Tap POI or Scan QR). Single Voice Rule: strictly one narration at a time. Offline-first: all content accessible without internet after initial sync.
+> **User-Triggered Audio Only**: No auto-play. Narration activates ONLY via explicit user interaction (Tap POI or Scan QR). Single Voice Rule: strictly one narration at a time. Content loads from the backend when the app is used.
 
 **See**: [`SPEC_CANONICAL.md`](./SPEC_CANONICAL.md) §2 (Core System Invariants)
 
@@ -37,9 +38,9 @@
 
 Để chạy dự án này, bạn cần cài đặt:
 
-* **Node.js**: Phiên bản 20+
-* **Docker Desktop**: Để chạy Database (PostgreSQL + Redis)
-* **Expo Go**: Cài trên điện thoại (iOS/Android) để chạy thử Mobile App
+- **Node.js**: Phiên bản 20+
+- **Docker Desktop**: Để chạy Database (PostgreSQL + Redis)
+- **Modern Browser**: Chrome / Edge / Firefox để chạy thử Web App local
 
 ---
 
@@ -74,15 +75,15 @@ Backend sẽ chạy tại `http://localhost:3000`:
 npm run dev:backend
 ```
 
-#### Bước 3: Chạy Mobile App
+#### Bước 3: Chạy Web App
 
-Sử dụng Expo để chạy ứng dụng trên thiết bị thật hoặc máy ảo:
+Sử dụng frontend dev server để chạy ứng dụng trên trình duyệt local:
 
 ```bash
-npm run dev:mobile
+npm run dev:web
 ```
 
-*Sau khi chạy lệnh, quét mã QR hiển thị trên Terminal bằng ứng dụng Expo Go.*
+*Sau khi chạy lệnh, mở địa chỉ local hiển thị trong terminal bằng trình duyệt.*
 
 ---
 
@@ -98,7 +99,7 @@ npm run dev:mobile
 ⚠️ **When documents conflict, follow this priority order**:
 
 | Priority | Document | Authority |
-|----------|----------|----------|
+| ---------- | ---------- | ---------- |
 | 1️⃣ **HIGHEST** | [README.md](./README.md) | Product vision |
 | 2️⃣ | [SPEC_CANONICAL.md](./SPEC_CANONICAL.md) | System invariants |
 | 3️⃣ | [AI_GUIDELINES.md](./AI_GUIDELINES.md) | AI guardrails, tech stack |
@@ -122,8 +123,8 @@ These 6 documents form the complete specification suite:
 2. **[`AI_GUIDELINES.md`](./AI_GUIDELINES.md)** – AI guardrails, technology stack, testing mandate
 3. **[`ARCHITECTURE.md`](./ARCHITECTURE.md)** – Technical implementation, data models, flows
 4. **[`docs/backend_design.md`](./docs/backend_design.md)** – API endpoints (15+), TTS pipeline, i18n strategy
-5. **[`docs/database_design.md`](./docs/database_design.md)** – PostgreSQL schema (8 tables), SQLite mirror, relationships
-6. **[`USE_CASES.md`](./USE_CASES.md)** – 8 detailed use cases (Authorization, Explore, Play, QR, Language, Controls, Tour, Offline)
+5. **[`docs/database_design.md`](./docs/database_design.md)** – PostgreSQL schema (8 tables), browser-accessed content model, relationships
+6. **[`USE_CASES.md`](./USE_CASES.md)** – 8 detailed use cases (Authorization, Explore, Play, QR, Language, Controls, Tour, Network)
 
 ### 🔵 Supporting Documentation
 
@@ -138,13 +139,15 @@ These 6 documents form the complete specification suite:
 **MANDATORY**: Read **[`TEAM_START_HERE.md`](./TEAM_START_HERE.md)** before coding.
 
 This file defines:
+
 - ✅ Mandatory read order for all AI code generation
 - ✅ Forbidden patterns (auto-play, background GPS, on-device TTS, etc.)
 - ✅ Testing requirements (AAA pattern, 70%+ coverage)
 - ✅ Pre-submission verification checklist
 
 **Read Order** (to avoid logic inconsistency):
-```
+
+```text
 1. README.md (this file)
 2. SPEC_CANONICAL.md §2-6 (system invariants)
 3. AI_GUIDELINES.md §2-6 (guardrails & stack)
@@ -159,31 +162,30 @@ This file defines:
 
 ## 🛠️ Technology Stack
 
-### Mobile Client (React Native / Expo)
+### Web Client (React + TypeScript)
 
 | Component | Technology | Purpose |
-|-----------|-----------|----------|
-| Framework | React Native 0.81+ (Expo SDK 54) | UI & interactions |
+| ---------- | ---------- | ---------- |
+| Framework | React 18+ + Vite | UI & interactions |
 | Language | TypeScript 5.0+ | Type safety |
-| Location | `expo-location` | Foreground GPS only |
-| **Audio** | **`expo-av`** | **Playback pre-generated MP3** (NOT on-device TTS) |
-| Offline | `expo-sqlite` | Local POI mirror |
-| Cache | `expo-file-system` | MP3 audio cache |
+| Location | Browser Geolocation API | Foreground GPS only |
+| **Audio** | **HTMLAudioElement / Howler.js** | **Playback pre-generated MP3** (NOT on-device TTS) |
+| Storage | Browser storage | Auth/session/preferences |
 | State | `zustand` | Global state & Narration State Machine |
-| Maps | `react-native-maps` | POI display & interaction |
+| Maps | Leaflet + OpenStreetMap | POI display & interaction |
 
-**Important**: TTS generation is **SERVER-SIDE ONLY** (not on-device). Mobile app plays pre-generated MP3 files from cache.  
+**Important**: TTS generation is **SERVER-SIDE ONLY** (not on-device). Web app plays pre-generated MP3 files from cache.  
 **See**: [`AI_GUIDELINES.md`](./AI_GUIDELINES.md) §2.1, [`SPEC_CANONICAL.md`](./SPEC_CANONICAL.md) §4.1
 
 ### Backend API (Node.js Monolith)
 
 | Component | Technology | Purpose |
-|-----------|-----------|----------|
+| ---------- | ---------- | ---------- |
 | Runtime | Node.js 20+ | Server process |
 | Framework | Express.js + TypeScript | REST API |
 | Database | PostgreSQL 14+ (with PostGIS) | Primary source of truth |
-| Cache | Redis | Query caching, sync manifest |
-| **TTS Engine** | **Piper (offline, free, no account)** | **Background job queue** (NOT on-device) |
+| Cache | Redis | Query caching |
+| **TTS Engine** | **Piper (self-hosted, free, no account)** | **Background job queue** (NOT on-device) |
 | Storage | Audio local filesystem + Image Cloudinary | Media files |
 | ORM | Prisma | Type-safe database access |
 | Jobs | BullMQ / Node-Schedule | Background TTS processing |
@@ -198,11 +200,11 @@ This file defines:
 **Different from GPS auto-trigger version:**
 
 | Aspect | ❌ Previous | ✅ Current (v2.0) |
-|--------|-----------|------------------|
+| -------- | --------- | ------------------ |
 | Audio Trigger | Geofence auto-play | User tap/QR only |
 | Background GPS | Continuous tracking | Foreground only (blue dot) |
 | Audio Generation | On-device TTS | Server-side MP3 batch |
-| Priority | Automation | User control + offline-first |
+| Priority | Automation | User control + live content |
 | Use Case | Auto-narration zones | Manual exploration narrative |
 
 **See**: [`SPEC_CANONICAL.md`](./SPEC_CANONICAL.md) §2 (System Invariants)
@@ -212,12 +214,15 @@ This file defines:
 ## 🔐 Authentication & Access
 
 **Two authentication paths**:
+
 1. **Sign Up** – Register a new account with Email/Password
 2. **Log In** – Access an existing account
 
-*(Note: Claim codes and payments are handled after successful login)*
+### Note
 
-**Both paths**: Trigger offline sync → User explores with cached data (no internet required)
+Claim codes and payments are handled after successful login.
+
+**Both paths**: Load content from API on demand → User explores with live data
 
 **See**: [`USE_CASES.md`](./USE_CASES.md) UC1 (Authorization), [`backend_design.md`](./docs/backend_design.md) §2.2 (Auth API)
 
@@ -226,7 +231,7 @@ This file defines:
 ## 📊 Key Metrics & SLA
 
 | Metric | Target | Reference |
-|--------|--------|-----------|
+| -------- | -------- | ----------- |
 | Tap Response | < 500ms | SPEC_CANONICAL.md §6 |
 | Audio Start | < 1-2s | SPEC_CANONICAL.md §6 |
 | API Response | < 200ms P95 | backend_design.md §6 |
@@ -240,6 +245,7 @@ This file defines:
 ## 📝 README Scope
 
 **README** provides:
+
 - ✅ Quick project overview & core principle
 - ✅ Setup instructions (Prerequisites, Installation, Running)
 - ✅ Documentation navigation for different roles
@@ -247,6 +253,7 @@ This file defines:
 - ✅ Links to complete specification suite
 
 **NOT in README** (see links above):
+
 - ❌ Detailed API specs → [`docs/backend_design.md`](./docs/backend_design.md)
 - ❌ Database schema → [`docs/database_design.md`](./docs/database_design.md)
 - ❌ Use case flows → [`USE_CASES.md`](./USE_CASES.md)
@@ -259,7 +266,7 @@ This file defines:
 ## 📋 Document Versions & Update History
 
 | Document | Version | Last Updated |
-|----------|---------|--------------|
+| ---------- | ------- | -------------- |
 | README.md | 2.0 | 2026-03-25 |
 | SPEC_CANONICAL.md | 2.0 | 2026-03-25 |
 | AI_GUIDELINES.md | 2.0 | 2026-03-25 |

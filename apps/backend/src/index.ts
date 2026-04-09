@@ -12,6 +12,8 @@ import adminRouter from './routes/api/admin';
 import poisRouter from './routes/api/pois';
 import toursRouter from './routes/api/tours';
 import analyticsRouter from './routes/api/analytics';
+import usersRouter from './routes/api/users';
+import searchRouter from './routes/api/search';
 import prisma from './lib/prisma';
 import { errorHandlingMiddleware, notFoundMiddleware } from './middlewares/errorHandlingMiddleware';
 import { initializeTtsWorker, validateTtsRuntimeConfig } from './services/ttsService';
@@ -20,8 +22,26 @@ import { initializePoiSoftDeleteCleanupScheduler } from './services/poiAdminServ
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const parsedPort = Number(process.env.PORT);
+const PORT = Number.isInteger(parsedPort) && parsedPort > 0 ? parsedPort : 3000;
 const OPENAPI_FILE_PATH = path.resolve(process.cwd(), 'openapi.json');
+
+async function validateAuthRoleSchema(): Promise<void> {
+  const missing = await prisma.$queryRaw<Array<{ column_name: string }>>`
+    SELECT required.column_name
+    FROM (VALUES ('role'), ('token_invalid_before')) AS required(column_name)
+    LEFT JOIN information_schema.columns c
+      ON c.table_schema = 'public'
+      AND c.table_name = 'users'
+      AND c.column_name = required.column_name
+    WHERE c.column_name IS NULL
+  `;
+
+  if (missing.length > 0) {
+    const columns = missing.map((item) => item.column_name).join(', ');
+    throw new Error(`Thiếu cột bắt buộc trong bảng users: ${columns}. Hãy chạy migration mới nhất trước khi khởi động server.`);
+  }
+}
 
 function loadOpenApiSpec() {
   if (!fs.existsSync(OPENAPI_FILE_PATH)) {
@@ -54,6 +74,8 @@ app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/pois', poisRouter);
 app.use('/api/v1/tours', toursRouter);
 app.use('/api/v1/analytics', analyticsRouter);
+app.use('/api/v1/users', usersRouter);
+app.use('/api/v1/search', searchRouter);
 
 app.get('/', async (req, res) => {
   try {
@@ -75,11 +97,14 @@ app.get('/', async (req, res) => {
 app.use(notFoundMiddleware);
 app.use(errorHandlingMiddleware);
 
-app.listen(PORT, async () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", async () => { // Thêm "0.0.0.0" để cho phép kết nối từ ngoài vào
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
   try {
     await prisma.$connect();
     console.log('Database connected successfully');
+
+    await validateAuthRoleSchema();
+    console.log('Auth role schema preflight passed');
 
     const ttsValidation = validateTtsRuntimeConfig();
     if (!ttsValidation.ok) {
@@ -102,4 +127,12 @@ app.listen(PORT, async () => {
   } catch (error) {
     console.error('Database connection failed:', error);
   }
+});
+// Thêm vào cuối file index.ts
+process.on('unhandledRejection', (reason, p) => {
+  console.log('Unhandled Rejection at: Promise', p, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
 });

@@ -3,8 +3,19 @@ import { getPublicPois, getPublicPoiById, searchPoisByRadius } from '../../servi
 import { isUserPremium } from '../../services/authService';
 import { requireAuth, AuthRequest } from '../../middlewares/authMiddleware';
 import asyncHandler from '../../utils/asyncHandler';
+import ApiError from '../../utils/ApiError';
+import { getFeaturedPois, getPoisByBounds } from '../../services/publicContentService';
 
 const router = Router();
+
+function requireUserId(req: AuthRequest): string {
+  const userId = req.user?.sub;
+  if (!userId) {
+    throw new ApiError(401, 'Token rỗng hoặc không hợp lệ.');
+  }
+
+  return userId;
+}
 
 /**
  * GET /api/v1/pois
@@ -21,7 +32,8 @@ router.get(
   '/',
   requireAuth,
   asyncHandler(async (req: AuthRequest, res) => {
-    const isPremium = await isUserPremium(req.user?.sub);
+    const userId = requireUserId(req);
+    const isPremium = await isUserPremium(userId);
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
 
@@ -48,7 +60,8 @@ router.get(
   '/:id',
   requireAuth,
   asyncHandler(async (req: AuthRequest, res) => {
-    const isPremium = await isUserPremium(req.user?.sub);
+    const userId = requireUserId(req);
+    const isPremium = await isUserPremium(userId);
     const id = String(req.params.id);
 
     const data = await getPublicPoiById(id, isPremium);
@@ -78,7 +91,8 @@ router.post(
   '/search/radius',
   requireAuth,
   asyncHandler(async (req: AuthRequest, res) => {
-    const isPremium = await isUserPremium(req.user?.sub);
+    const userId = requireUserId(req);
+    const isPremium = await isUserPremium(userId);
     const { latitude, longitude, radiusM, limit } = req.body;
 
     const data = await searchPoisByRadius(
@@ -92,6 +106,66 @@ router.post(
     return res.status(200).json({
       status: 'success',
       ...data // data contains items and meta
+    });
+  })
+);
+
+/**
+ * GET /api/v1/pois/featured
+ * @summary Get featured POIs
+ * @description Retrieve top-rated or recently published POIs for homepage showcase
+ * @tags POIs
+ * @security bearerAuth
+ * @param {number} limit.query - Max items (default: 6, max: 20)
+ * @return {object} 200 - Featured POIs list
+ * @return {object} 401 - Unauthorized
+ * @return {object} 500 - Internal Server Error
+ */
+router.get(
+  '/featured',
+  asyncHandler(async (req: AuthRequest, res) => {
+    const isPremium = false;
+    const limit = Math.min(parseInt(req.query.limit as string) || 6, 20);
+
+    const data = await getFeaturedPois(limit, isPremium);
+    return res.status(200).json({
+      status: 'success',
+      data
+    });
+  })
+);
+
+/**
+ * POST /api/v1/pois/bounds
+ * @summary Get POIs within geographic bounds
+ * @description Return POIs displayed within map view bounds
+ * @tags POIs
+ * @security bearerAuth
+ * @param {object} request.body.required - Bounds criteria
+ * @param {number} request.body.north.required - North latitude boundary
+ * @param {number} request.body.south.required - South latitude boundary
+ * @param {number} request.body.east.required - East longitude boundary
+ * @param {number} request.body.west.required - West longitude boundary
+ * @return {object} 200 - POIs within bounds
+ * @return {object} 400 - Invalid bounds
+ * @return {object} 401 - Unauthorized
+ * @return {object} 500 - Internal Server Error
+ */
+router.post(
+  '/bounds',
+  asyncHandler(async (req: AuthRequest, res) => {
+    const isPremium = false;
+    const { north, south, east, west } = req.body;
+
+    if (typeof north !== 'number' || typeof south !== 'number' || 
+        typeof east !== 'number' || typeof west !== 'number') {
+      throw new ApiError(400, 'Bounds phải có north, south, east, west là số.');
+    }
+
+    const data = await getPoisByBounds(north, south, east, west, 500, isPremium);
+    return res.status(200).json({
+      status: 'success',
+      data
     });
   })
 );

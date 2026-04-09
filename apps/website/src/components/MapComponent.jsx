@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   Circle,
   CircleMarker,
@@ -9,6 +9,8 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import { Search, Mic, SlidersHorizontal, Headphones } from "lucide-react";
+import { poisAPI } from "../lib/api";
+import { useLanguage, pickLocalizedText, useTranslation } from "../hooks/useLanguageContext";
 import "leaflet/dist/leaflet.css";
 import POIDetailPanel from "./POIDetailPanel";
 
@@ -22,73 +24,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl:
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
-
-const samplePOIs = [
-  {
-    id: 1,
-    name: "Phở Thìn",
-    description:
-      "A traditional pho restaurant famous for its broth simmered for 24 hours. Fresh beef, tender noodles, and a welcoming atmosphere that always draws crowds.",
-    descriptionVi:
-      "Quán phở truyền thống nổi tiếng với nước dùng được nấu suốt 24 giờ. Thịt bò tươi ngon, bánh phở mỏng mềm. Địa chỉ hiếu khách, luôn có khách.",
-    lat: 10.7719,
-    lng: 106.7009,
-    image:
-      "https://images.unsplash.com/photo-1582158471487-881fac40a6f1?w=400&h=300&fit=crop",
-    audioUrl: "/audio/pho-thin.wav",
-    geofenceRadius: 100,
-    category: "Food",
-    durationLabel: "~1m 05s",
-  },
-  {
-    id: 2,
-    name: "Bánh Mì Nguyễn Hữu Cảnh",
-    description:
-      "Famous for its crispy crust and generous fillings including pâté, cold cuts, pickled vegetables, and the signature pungent fish sauce.",
-    descriptionVi:
-      "Bánh mì nổi tiếng với crust giòn, nhân đầy đặn gồm giăm, pâté, dưa cà rốt. Được ăn kèm với nước mắm chua cay đặc trưng.",
-    lat: 10.7761,
-    lng: 106.7095,
-    image:
-      "https://images.unsplash.com/photo-1555939594-58d7cb561643?w=400&h=300&fit=crop",
-    audioUrl: "/audio/banh-mi-nguyen-huu-canh.wav",
-    geofenceRadius: 120,
-    category: "Food",
-    durationLabel: "~1m 12s",
-  },
-  {
-    id: 3,
-    name: "Cơm Tấm Sài Gòn",
-    description:
-      "A Saigon specialty featuring broken rice served with grilled pork chops, shredded pork, egg, tomato, and cucumber. Savory, aromatic, and distinctly flavorful.",
-    descriptionVi:
-      "Cơm tấm - đặc sản Sài Gòn với hạt gạo nhỏ, ăn kèm sườn nướng, bì, trứng, cà chua, dưa leo. Vị mặn, mừi, thơm đặc trưng.",
-    lat: 10.7774,
-    lng: 106.6983,
-    image:
-      "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop",
-    audioUrl: "/audio/com-tam-sai-gon.wav",
-    geofenceRadius: 90,
-    category: "Food",
-    durationLabel: "~1m 20s",
-  },
-  {
-    id: 4,
-    name: "Chè Ba Má",
-    description:
-      "A refreshing beverage shop offering various traditional Vietnamese sweet drinks made with beans and grains, served in a peaceful and welcoming atmosphere.",
-    descriptionVi:
-      "Quân chè ngon với các loại chè nành, chè đậu, chè hạt. Nước ngọt mát, được phục vụ trong không khí yên tĩnh.",
-    lat: 10.7823,
-    lng: 106.7063,
-    image:
-      "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&h=300&fit=crop",
-    audioUrl: "/audio/che-ba-ma.wav",
-    geofenceRadius: 140,
-    category: "Food",
-    durationLabel: "~1m 08s",
-  },
-];
 
 const AUTOPLAY_SESSION_KEY = "phoamthuc-autoplay-poi-ids";
 
@@ -111,22 +46,33 @@ const calculateDistanceMeters = (lat1, lng1, lat2, lng2) => {
 };
 
 export default function MapComponent() {
+  const [poisRaw, setPoisRaw] = useState([]);
   const [selectedPOI, setSelectedPOI] = useState(null);
   const [searchText, setSearchText] = useState("");
   const [mapInstance, setMapInstance] = useState(null);
   const [userPosition, setUserPosition] = useState(null);
   const [autoPlaySignal, setAutoPlaySignal] = useState(0);
   const [toastMessage, setToastMessage] = useState("");
-  const [poiRadiusById, setPoiRadiusById] = useState(() =>
-    Object.fromEntries(
-      samplePOIs.map((poi) => [poi.id, poi.geofenceRadius || 120]),
-    ),
-  );
-
+  const [, setIsLoadingPOIs] = useState(false);
+  const [poiRadiusById, setPoiRadiusById] = useState({});
   const enteredPoiIdsRef = useRef(new Set());
   const autoplayedPoiIdsRef = useRef(new Set());
+  const { language } = useLanguage();
+  const t = useTranslation();
 
   const defaultPosition = [10.7769, 106.7009];
+
+  // Normalize POIs based on current language
+  const pois = useMemo(
+    () =>
+      (poisRaw || []).map((poi) => ({
+        ...poi,
+        name: pickLocalizedText(poi.name, language, "Untitled POI"),
+        description: pickLocalizedText(poi.description, language, ""),
+        descriptionVi: pickLocalizedText(poi.description, language, ""),
+      })),
+    [poisRaw, language],
+  );
 
   const normalizeText = (value) =>
     (value || "")
@@ -134,17 +80,71 @@ export default function MapComponent() {
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase();
 
+  // Fetch POIs when map bounds change
+  const fetchPOIsByBounds = useCallback(
+    async (north, south, east, west) => {
+      try {
+        setIsLoadingPOIs(true);
+        const data = await poisAPI.getByBounds(north, south, east, west);
+        setPoisRaw(data || []);
+      } catch (err) {
+        console.error("Failed to fetch POIs:", err);
+        setPoisRaw([]);
+      } finally {
+        setIsLoadingPOIs(false);
+      }
+    },
+    [],
+  );
+
+  // Load initial POIs when map instance is ready
+  useEffect(() => {
+    if (!mapInstance) return;
+    const bounds = mapInstance.getBounds();
+    fetchPOIsByBounds(
+      bounds.getNorth(),
+      bounds.getSouth(),
+      bounds.getEast(),
+      bounds.getWest(),
+    );
+  }, [mapInstance, fetchPOIsByBounds]);
+
+  // Refetch POIs when map pans or zooms
+  useEffect(() => {
+    if (!mapInstance) return;
+    const handleMoveEnd = () => {
+      const bounds = mapInstance.getBounds();
+      fetchPOIsByBounds(
+        bounds.getNorth(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getWest(),
+      );
+    };
+    mapInstance.on("moveend", handleMoveEnd);
+    return () => mapInstance.off("moveend", handleMoveEnd);
+  }, [mapInstance, fetchPOIsByBounds]);
+
+  // Update selectedPOI when language changes (to get updated localized text)
+  useEffect(() => {
+    if (!selectedPOI) return;
+    const updatedPOI = pois.find((p) => p.id === selectedPOI.id);
+    if (updatedPOI && updatedPOI.name !== selectedPOI.name) {
+      setSelectedPOI(updatedPOI);
+    }
+  }, [pois, selectedPOI]);
+
   const filteredPOIs = useMemo(() => {
     const keyword = normalizeText(searchText.trim());
-    if (!keyword) return samplePOIs;
+    if (!keyword) return pois;
 
-    return samplePOIs.filter((poi) => {
+    return pois.filter((poi) => {
       const haystack = normalizeText(
         `${poi.name} ${poi.description} ${poi.descriptionVi}`,
       );
       return haystack.includes(keyword);
     });
-  }, [searchText]);
+  }, [searchText, pois]);
 
   useEffect(() => {
     try {
@@ -184,13 +184,13 @@ export default function MapComponent() {
         let nearestEnteredPOI = null;
         let nearestDistance = Number.POSITIVE_INFINITY;
 
-        samplePOIs.forEach((poi) => {
+        pois.forEach((poi) => {
           const poiRadius = poiRadiusById[poi.id] || 120;
           const distance = calculateDistanceMeters(
             latitude,
             longitude,
-            poi.lat,
-            poi.lng,
+            poi.latitude,
+            poi.longitude,
           );
 
           if (distance <= poiRadius) {
@@ -224,7 +224,7 @@ export default function MapComponent() {
 
           if (mapInstance) {
             mapInstance.flyTo(
-              [nearestEnteredPOI.lat, nearestEnteredPOI.lng],
+              [nearestEnteredPOI.latitude, nearestEnteredPOI.longitude],
               16,
               {
                 duration: 1.2,
@@ -246,7 +246,7 @@ export default function MapComponent() {
     return () => {
       navigator.geolocation.clearWatch(watchId);
     };
-  }, [mapInstance, poiRadiusById]);
+  }, [mapInstance, poiRadiusById, pois]);
 
   const handleRadiusChange = (poiId, radius) => {
     setPoiRadiusById((prev) => ({
@@ -261,7 +261,7 @@ export default function MapComponent() {
 
     if (!mapInstance) return;
 
-    mapInstance.flyTo([poi.lat, poi.lng], 16, {
+    mapInstance.flyTo([poi.latitude, poi.longitude], 16, {
       duration: 1.2,
     });
   };
@@ -280,13 +280,13 @@ export default function MapComponent() {
                 focusPOI(filteredPOIs[0]);
               }
             }}
-            placeholder="Search food, landmarks on Vĩnh Khánh street..."
+            placeholder={t.map.search}
             className="flex-1 px-3 text-base outline-none text-slate-700 placeholder:text-slate-400"
           />
           <button
             type="button"
             className="text-orange-500 hover:text-orange-600 transition"
-            aria-label="Voice search"
+            aria-label={t.map.search}
           >
             <Mic size={22} />
           </button>
@@ -310,7 +310,7 @@ export default function MapComponent() {
               ))
             ) : (
               <p className="px-4 py-3 text-sm text-slate-500">
-                Không tìm thấy địa điểm phù hợp.
+                {t.map.noResults}
               </p>
             )}
           </div>
@@ -319,11 +319,11 @@ export default function MapComponent() {
         <details className="mt-2 rounded-2xl bg-white/95 shadow-lg border border-gray-100 overflow-hidden">
           <summary className="cursor-pointer list-none px-4 py-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
             <SlidersHorizontal size={16} className="text-orange-500" />
-            Chỉnh bán kính nhận diện POI
+            {t.map.radiusLabel}
           </summary>
 
           <div className="px-4 pb-4 space-y-3 border-t border-gray-100">
-            {samplePOIs.map((poi) => (
+            {pois.map((poi) => (
               <label key={`radius-${poi.id}`} className="block">
                 <div className="flex items-center justify-between mb-1 text-xs text-slate-600">
                   <span className="font-medium">{poi.name}</span>
@@ -359,10 +359,10 @@ export default function MapComponent() {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
 
-        {samplePOIs.map((poi) => (
+        {pois.map((poi) => (
           <Circle
             key={`geofence-${poi.id}`}
-            center={[poi.lat, poi.lng]}
+            center={[poi.latitude, poi.longitude]}
             radius={poiRadiusById[poi.id] || 120}
             pathOptions={{
               color: "#f97316",
@@ -389,7 +389,7 @@ export default function MapComponent() {
         {filteredPOIs.map((poi) => (
           <Marker
             key={poi.id}
-            position={[poi.lat, poi.lng]}
+            position={[poi.latitude, poi.longitude]}
             eventHandlers={{
               click: () => setSelectedPOI(poi),
             }}

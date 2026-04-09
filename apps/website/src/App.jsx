@@ -1,24 +1,62 @@
 import "./App.css";
-import { useRoutes, Link, NavLink, useLocation } from "react-router-dom";
+import {
+  useRoutes,
+  Link,
+  NavLink,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+import { useState, useEffect } from "react";
 import { routes } from "./routes";
 import MapComponent from "./components/MapComponent";
 import BrandLogo from "./components/BrandLogo";
-
-const navItems = [
-  { to: "/", label: "Map" },
-  { to: "/admin", label: "Admin" },
-  { to: "/about", label: "About" },
-  { to: "/login", label: "Login" },
-];
+import LanguageSelector from "./components/LanguageSelector";
+import { useTranslation } from "./hooks/useLanguageContext";
 
 function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    () => !!localStorage.getItem("accessToken"),
+  );
+  const navigate = useNavigate();
+  const t = useTranslation();
+
+  const navItems = [
+    { to: "/", label: t.nav.map },
+    { to: "/admin", label: t.nav.admin },
+    { to: "/about", label: t.nav.about },
+    ...(isLoggedIn ? [] : [{ to: "/login", label: t.nav.login }]),
+  ];
+
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === "accessToken" || e.key === null) {
+        const newToken = localStorage.getItem("accessToken");
+        setIsLoggedIn(!!newToken);
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    setIsLoggedIn(false);
+    navigate("/login");
+  };
   const routeElement = useRoutes(routes);
   const location = useLocation();
 
   // Check if current route should show map in background
-  const showMapBackground = !["/", "/admin", "/login", "/register"].includes(
-    location.pathname,
-  );
+  const showMapBackground = ![
+    "/",
+    "/admin",
+    "/login",
+    "/register",
+    "/profile",
+    "/partner-profile",
+  ].includes(location.pathname);
 
   return (
     <div className="w-screen h-screen flex flex-col bg-slate-100">
@@ -48,12 +86,23 @@ function App() {
               ))}
             </ul>
 
+            <LanguageSelector />
+
             <Link
-              to="/register"
+              to={isLoggedIn ? "/profile" : "/register"}
               className="px-3 sm:px-5 py-2 rounded-xl bg-linear-to-r from-orange-500 to-rose-500 text-white text-sm font-bold shadow-md shadow-orange-200 hover:brightness-105 transition whitespace-nowrap"
             >
-              Join Now
+              {isLoggedIn ? t.nav.profile : t.nav.join}
             </Link>
+
+            {isLoggedIn && (
+              <button
+                onClick={handleLogout}
+                className="px-3 sm:px-5 py-2 rounded-xl border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-100 transition whitespace-nowrap"
+              >
+                {t.nav.logout}
+              </button>
+            )}
           </div>
         </div>
       </nav>

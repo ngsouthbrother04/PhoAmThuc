@@ -10,8 +10,11 @@ import {
   Volume2,
   X,
 } from "lucide-react";
+import { useLanguage, pickLocalizedText, useTranslation } from "../hooks/useLanguageContext";
 
 export default function POIDetailPanel({ poi, onClose, autoPlayTrigger = 0 }) {
+  const { language } = useLanguage();
+  const t = useTranslation();
   const audioRef = useRef(null);
   const speechRef = useRef(null);
   const progressRafRef = useRef(null);
@@ -24,8 +27,12 @@ export default function POIDetailPanel({ poi, onClose, autoPlayTrigger = 0 }) {
   const [isMarked, setIsMarked] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
-  const descriptionText = poi.description || poi.descriptionVi || "";
-  const descriptionLanguage = poi.description ? "en-US" : "vi-VN";
+  const poiName = pickLocalizedText(poi.name, language, "Untitled POI");
+  const poiDescription = pickLocalizedText(poi.description, language, "");
+  const descriptionText = poiDescription;
+  const descriptionLanguage = (navigator.language || "vi-VN").startsWith("vi")
+    ? "vi-VN"
+    : "en-US";
 
   const stopDescription = useCallback(() => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
@@ -206,7 +213,7 @@ export default function POIDetailPanel({ poi, onClose, autoPlayTrigger = 0 }) {
         <div className="w-full h-48 overflow-hidden">
           <img
             src={poi.image}
-            alt={poi.name}
+            alt={poiName}
             className="w-full h-full object-cover"
           />
         </div>
@@ -219,17 +226,17 @@ export default function POIDetailPanel({ poi, onClose, autoPlayTrigger = 0 }) {
           <div className="flex items-center gap-2 mb-2">
             <Landmark className="text-orange-500" size={18} />
             <span className="text-orange-500 font-medium text-sm">
-              Narration point
+              {t.poi.narrationPoint}
             </span>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">{poi.name}</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{poiName}</h1>
         </div>
 
         {/* Description */}
         <div className="mb-6 rounded-2xl bg-orange-50/70 border border-orange-100 p-4">
           <div className="flex items-center justify-between gap-3 mb-3">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-600">
-              Description voice
+              {t.poi.descriptionVoice}
             </p>
             <button
               type="button"
@@ -241,11 +248,11 @@ export default function POIDetailPanel({ poi, onClose, autoPlayTrigger = 0 }) {
               }`}
             >
               <Volume2 size={14} />
-              {isSpeaking ? "Stop voice" : "Read description"}
+              {isSpeaking ? t.poi.stopVoice : t.poi.readDescription}
             </button>
           </div>
           <p className="text-gray-700 text-base leading-relaxed">
-            {poi.description}
+            {poiDescription}
           </p>
         </div>
 
@@ -253,7 +260,7 @@ export default function POIDetailPanel({ poi, onClose, autoPlayTrigger = 0 }) {
         <div className="flex items-center gap-2 mb-6 pb-6 border-b border-gray-200">
           <Globe className="text-orange-500" size={16} />
           <span className="text-orange-500 font-medium text-sm">
-            EN TRANSLATED
+            {t.poi.translated}
           </span>
         </div>
 
@@ -341,7 +348,7 @@ export default function POIDetailPanel({ poi, onClose, autoPlayTrigger = 0 }) {
               type="button"
               onClick={() => handleSkip(-5)}
               className="inline-flex h-11 w-full items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:-translate-y-0.5 hover:border-orange-200 hover:text-orange-500"
-              aria-label="Back 5 seconds"
+              aria-label={t.poi.back5Seconds}
             >
               <SkipBack size={18} />
             </button>
@@ -349,7 +356,7 @@ export default function POIDetailPanel({ poi, onClose, autoPlayTrigger = 0 }) {
               type="button"
               onClick={() => handleSkip(-currentTime)}
               className="inline-flex h-11 w-full items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:-translate-y-0.5 hover:border-orange-200 hover:text-orange-500"
-              aria-label="Replay from start"
+              aria-label={t.poi.replayFromStart}
             >
               <Timer size={18} />
             </button>
@@ -357,7 +364,7 @@ export default function POIDetailPanel({ poi, onClose, autoPlayTrigger = 0 }) {
               type="button"
               onClick={() => handleSkip(5)}
               className="inline-flex h-11 w-full items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:-translate-y-0.5 hover:border-orange-200 hover:text-orange-500"
-              aria-label="Forward 5 seconds"
+              aria-label={t.poi.forward5Seconds}
             >
               <SkipForward size={18} />
             </button>
@@ -390,7 +397,7 @@ export default function POIDetailPanel({ poi, onClose, autoPlayTrigger = 0 }) {
               : "bg-gray-900 text-white hover:bg-gray-800"
           }`}
         >
-          {isMarked ? "Marked" : "Stop & Mark"}
+          {isMarked ? t.poi.marked : t.poi.stopAndMark}
         </button>
 
         {/* Vietnamese Translation */}

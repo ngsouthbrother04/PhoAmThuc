@@ -1,13 +1,17 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { authAPI } from "../lib/api";
 import AnimatedBackground from "../components/AnimatedBackground";
+import { useToast } from "../hooks/useToast";
+import { useTranslation } from "../hooks/useLanguageContext";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
+  const { showSuccess, showError } = useToast();
+  const t = useTranslation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,30 +19,28 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      const data = await authAPI.login(email, password);
 
-      if (!response.ok) {
-        throw new Error("Login failed");
+      if (data.accessToken) {
+        localStorage.setItem("accessToken", data.accessToken);
+        localStorage.setItem("refreshToken", data.refreshToken);
+        showSuccess(t.toast?.loginSuccess || "Login successful!");
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 1000);
+      } else {
+        const errorMsg = data.message || t.toast?.loginFailed || "Login failed";
+        setError(errorMsg);
+        showError(errorMsg);
       }
-
-      const data = await response.json();
-      // TODO: Store token in localStorage or secure storage
-      localStorage.setItem("token", data.token);
-      navigate("/");
     } catch (err) {
-      setError(err.message || "An error occurred during login");
+      const errorMsg = err.message || t.toast?.loginError || "An error occurred during login";
+      setError(errorMsg);
+      showError(errorMsg);
     } finally {
       setIsLoading(false);
     }
   };
-
   return (
     <div className="relative w-full min-h-full overflow-hidden">
       <AnimatedBackground />

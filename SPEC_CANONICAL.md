@@ -14,7 +14,7 @@
 3. **AI_GUIDELINES.md** – AI guardrails & technology stack
 4. **ARCHITECTURE.md** – Technical blueprint & implementation patterns
 5. **docs/backend_design.md** – API endpoints & TTS pipeline
-6. **docs/database_design.md** – PostgreSQL schema & SQLite mirror
+6. **docs/database_design.md** – PostgreSQL schema & API-driven client data
 7. **USE_CASES.md** – 8 detailed user stories & flows
 8. **docs/test_scenarios.md** – 100+ test cases & validation matrix
 
@@ -50,7 +50,7 @@ User-controlled food exploration is the priority. Narration plays ONLY when the 
 **Reference**: USE_CASES.md UC3.A1 (Single Voice Override), test_scenarios.md TC-3.2
 
 ### 2.3 Location Privacy (Foreground-Only, No Tracking)
-**GPS Constraint**: Foreground location only (`expo-location`)  
+**GPS Constraint**: Foreground location only (browser geolocation)  
 **Allowed Uses**:
 - Display user location as blue dot on map
 - Optional visual highlighting of nearby POIs (informational only)
@@ -64,25 +64,25 @@ User-controlled food exploration is the priority. Narration plays ONLY when the 
 
 **Reference**: AI_GUIDELINES.md §2, SPEC_CANONICAL.md §6 (Non-Goals)
 
-### 2.4 Offline-First Architecture
-**Requirement**: All POI data & audio accessible without internet after initial sync.  
+### 2.4 Online-First Architecture
+**Requirement**: All POI data and audio are loaded from the backend at runtime.  
 **Tech Stack**:
-- SQLite (via `expo-sqlite`): Local mirror tables — `pois`, `tours`, `sync_metadata`
-- File System (via `expo-file-system`): MP3 audio cache  
-- Server Sync: Atomic manifest versioning + SQLite replace
+- Browser fetch: POI and tour data from REST API
+- Browser state: Runtime state plus persisted preferences
+- Server delivery: API response versioning and cache-friendly headers
 
-**Reference**: database_design.md §7 (SQLite Mobile Mirror), USE_CASES.md UC8 (Offline Access)
+**Reference**: database_design.md §7 (API-driven client data), USE_CASES.md UC8 (Network Required Content Access)
 
 ### 2.5 Server-Side TTS Generation (Never On-Device)
 **Process**:
 1. Admin creates/edits POI via CMS
 2. Backend triggers background job queue
-3. Piper generates MP3 offline on backend (15 languages)
-4. Audio URLs saved to PostgreSQL `audio_urls` JSONB
-5. Mobile sync caches MP3 files locally
-6. App plays from cache only
+3. Piper generates MP3 on backend (15 languages)
+4. Audio URLs saved to PostgreSQL `audio_urls`
+5. Web client fetches MP3 files on demand
+6. App plays fetched MP3 URLs only
 
-**Banned**: On-device TTS (expo-speech forbidden for generation)  
+**Banned**: On-device TTS (browser TTS / expo-speech forbidden for generation)  
 **Reference**: backend_design.md §3 (TTS Pipeline), ARCHITECTURE.md §3.3
 
 ### 2.6 Analytics Logging (Mandatory)
@@ -91,7 +91,111 @@ User-controlled food exploration is the priority. Narration plays ONLY when the 
 - User auth & access (UC1)
 - POI interactions (tap, play, pause, stop)
 - Language changes
-- Offline/online transitions
+- Network retry and refresh behavior
+
+**Storage**: Buffered locally, batch-uploaded when online.  
+**Reference**: test_scenarios.md TC-16 (Integration Tests — Analytics)
+
+### 2.7 Overlapping Nearby-POI Zones (Deterministic, Visual-Only)
+**Rule**: Overlapping radius zones are allowed for discovery UI, but MUST NOT auto-trigger playback.
+
+**Behavior Contract**:
+- Nearby highlighting can display multiple POIs at once.
+- Playback still requires explicit user action (Tap marker or Scan QR).
+- If system needs a single "recommended" POI in overlap areas, use deterministic ranking:
+  1) shortest distance
+  2) higher `tour_priority` (if configured)
+  3) lexicographically smaller `poi_id` as final tie-break
+
+**Forbidden**:
+- ❌ Auto-play based on overlap result
+- ❌ Hidden/random tie-breaking that changes between requests
+
+**Reference**: ARCHITECTURE.md §3.1 (Map Engine), docs/test_scenarios.md (Overlap tests)
+
+### 2.8 TTS Queue at Scale (Single Backend, Controlled Concurrency)
+**Rule**: Keep monolith architecture, but queue processing must be explicit and scalable.
+
+**Queue Contract**:
+- Use one logical queue for TTS jobs (BullMQ/Redis).
+- Job idempotency key: `{poiId}:{language}:{contentVersion}`.
+- Concurrency is configurable (start with 5 workers).
+- Retries use exponential backoff (e.g., 3 attempts, 2s/8s/30s).
+- Failed jobs move to DLQ/failed set for admin retry.
+
+**Forbidden**:
+- ❌ Fire-and-forget TTS without persisted job state
+- ❌ Switching to Kafka/RabbitMQ for MVP
+
+**Reference**: docs/backend_design.md §3 (TTS Pipeline), ARCHITECTURE.md §3.3
+
+### 2.9 Online Users Metric (Canonical Definition)
+**Rule**: "Online now" is an operational metric, not a billing/security identity metric.
+
+**Definition**:
+- `online_now`: unique devices/users with heartbeat in the last 90 seconds.
+- `active_5m`: unique devices/users with heartbeat or interaction event in the last 5 minutes.
+- Heartbeat interval target: every 30 seconds while app is foreground.
+
+**Notes**:
+- Presence data TTL-based (ephemeral), not long-term tracking.
+- Dashboard must label definitions clearly to avoid misunderstanding.
+
+**Reference**: docs/backend_design.md (Analytics endpoints), docs/test_scenarios.md (Presence tests)
+
+### 9.2 Mandatory Testing Requirement
+
+### 2.2 Single Voice Rule (Strict Enforcement)
+**Property**: The app MUST NEVER play two audio narrations simultaneously.  
+**Behavior**: If user taps POI-B while POI-A is playing → Stop POI-A (< 100ms) → Start POI-B.  
+**Exception Handling**: No exceptions allowed (even for paused audio).  
+**State Machine**: IDLE ↔ PLAYING ↔ PAUSED (per ARCHITECTURE.md §3.2)
+
+**Reference**: USE_CASES.md UC3.A1 (Single Voice Override), test_scenarios.md TC-3.2
+
+### 2.3 Location Privacy (Foreground-Only, No Tracking)
+**GPS Constraint**: Foreground location only (browser geolocation)  
+**Allowed Uses**:
+- Display user location as blue dot on map
+- Optional visual highlighting of nearby POIs (informational only)
+- Backend PostGIS radius search (user manually triggers via UI)
+
+**Forbidden**:
+- ❌ Background location tracking
+- ❌ Battery-draining continuous updates
+- ❌ Geofence monitoring
+- ❌ Location history storage
+
+**Reference**: AI_GUIDELINES.md §2, SPEC_CANONICAL.md §6 (Non-Goals)
+
+### 2.4 Online-First Architecture
+**Requirement**: All POI data and audio are loaded from the backend at runtime.  
+**Tech Stack**:
+- Browser fetch: POI and tour data from REST API
+- Browser state: Runtime state plus persisted preferences
+- Server delivery: API response versioning and cache-friendly headers
+
+**Reference**: database_design.md §7 (Web Client Data Contract), USE_CASES.md UC8 (Network Required Content Access)
+
+### 2.5 Server-Side TTS Generation (Never On-Device)
+**Process**:
+1. Admin creates/edits POI via CMS
+2. Backend triggers background job queue
+3. Piper generates MP3 on backend (15 languages)
+4. Audio URLs saved to PostgreSQL `audio_urls` JSONB
+5. Web client fetches MP3 files on demand
+6. App plays fetched MP3 URLs only
+
+**Banned**: On-device TTS (browser TTS / expo-speech forbidden for generation)  
+**Reference**: backend_design.md §3 (TTS Pipeline), ARCHITECTURE.md §3.3
+
+### 2.6 Analytics Logging (Mandatory)
+**Rule**: Analytics tracking must NOT be removed or disabled.  
+**Events Logged**:
+- User auth & access (UC1)
+- POI interactions (tap, play, pause, stop)
+- Language changes
+- Network retry and refresh behavior
 
 **Storage**: Buffered locally, batch-uploaded when online.  
 **Reference**: test_scenarios.md TC-16 (Integration Tests — Analytics)
@@ -149,7 +253,7 @@ User-controlled food exploration is the priority. Narration plays ONLY when the 
 - **Represents**: Fixed physical POI (food stall with physical QR sticker)
 - **Trigger Type**: Direct user interaction (explicit scan)
 - **Payload Format**: POI ID (e.g., `poi_001`)
-- **Flow**: Decode → Lookup in SQLite → Dispatch PLAY_EVENT → State Machine transition
+- **Flow**: Decode → Fetch POI from API → Dispatch PLAY_EVENT → State Machine transition
 
 ### 3.2 State Machine Integration
 - QR scan triggers PLAY_EVENT (same as tap)
@@ -160,17 +264,17 @@ User-controlled food exploration is the priority. Narration plays ONLY when the 
 
 ## 4. Canonical Technology Stack (STRICT)
 
-### 4.1 Mobile Client Stack
+### 4.1 Web Client Stack
 | Component | Technology | Purpose | Constraint |
 |-----------|-----------|---------|----------|-
-| Framework | React Native 0.81+ (Expo SDK 54) | UI & interactions | Managed workflow only |
+| Framework | React 18+ + Vite | UI & interactions | Browser runtime only |
 | Language | TypeScript 5.0+ | Type safety | No JavaScript escape |
-| Location | `expo-location` | Foreground GPS only | No background tracking |
-| Audio | `expo-av` | Playback pre-generated MP3 | NO on-device TTS |
-| Offline | `expo-sqlite` | Local POI mirror | Atomic sync only |
-| Files | `expo-file-system` | MP3 cache | ~100-500MB per device |
+| Location | Browser Geolocation API | Foreground GPS only | No background tracking |
+| Audio | HTMLAudioElement / Howler.js | Playback pre-generated MP3 | NO browser TTS |
+| Client State | Browser storage / memory | Session preferences | No offline mirror |
+| Files | HTTP fetch | MP3 playback URL | Network required |
 | State | `zustand` | Audio & app state | Use for Single Voice Rule |
-| Maps | `react-native-maps` | POI display & interaction | No custom geofencing |
+| Maps | Leaflet + OpenStreetMap | POI display & interaction | No custom geofencing |
 
 **Reference**: AI_GUIDELINES.md §2.1, ARCHITECTURE.md §2.1
 
@@ -219,7 +323,7 @@ PLAYING → PLAY_EVENT(POI-B) → [STOP POI-A immediately < 100ms] → IDLE → 
 ```
 
 ### 5.3 Implementation Contract
-- **Framework**: Zustand global store (mobile)
+- **Framework**: Zustand global store (web)
 - **Event Dispatcher**: React components on POI tap or QR scan
 - **Timing**: State transition < 50ms, audio stop < 100ms
 - **Concurrency**: No parallel PLAY events (reject if PLAYING)
@@ -234,7 +338,7 @@ PLAYING → PLAY_EVENT(POI-B) → [STOP POI-A immediately < 100ms] → IDLE → 
 | Audio Start | < 1-2s from "Nghe" tap | P95 latency measurement |
 | API Response | < 200ms P95 | Backend load test |
 | Full Sync | < 5s (first run) | Network simulation |
-| Offline Startup | < 2s (no network) | Device cold start test |
+| Network Unavailable UI | < 2s | Retry / unavailable state test |
 | Memory Usage | < 150MB peak | iOS/Android profiler |
 | Battery Impact | < 10% per hour | Battery drain test |
 | Uptime | 99.9% | Monitoring SLA |
@@ -255,52 +359,49 @@ PLAYING → PLAY_EVENT(POI-B) → [STOP POI-A immediately < 100ms] → IDLE → 
 | `payment_callback_events` | 10+/day | Webhook logs | database_design.md §2.8 |
 | `app_settings` | <10 | System config | database_design.md §2.9 |
 
-### 7.2 Mobile Mirror Table (SQLite)
+### 7.2 Web Client Data Contract
 | Table | Schema | Purpose |
 |-------|--------|--------|-
-| `pois` | Simplified version of `points_of_interest` | Offline POI data |
-| `tours` | Subset of `tours` | Offline tour data |
+| `pois` | API representation of `points_of_interest` | Live POI data |
+| `tours` | API representation of `tours` | Live tour data |
 | `sync_metadata` | `{table_name, last_sync_version, last_sync_at}` | Manifest tracking |
 
 **Critical**: Table names are locked. No renaming without full migration plan & testing.  
-**Reference**: database_design.md §7 (SQLite Mobile Mirror)
+**Reference**: database_design.md §7 (Web Client Data Contract)
 
-## 8. Offline-First Sync Contract
+## 8. Network Refresh Contract
 
 ### 8.1 Sync Trigger Points
-1. **App Launch**: Check sync manifest version
+1. **App Launch**: Fetch current data from API
 2. **Manual Refresh**: User swipes down (pull-to-refresh)
-3. **Network Change**: Detect WiFi/cellular transition
+3. **Network Change**: Retry failed requests after reconnect
 
 ### 8.2 Manifest Check Flow
 ```
-Mobile GET /api/v1/sync/manifest
-  ↓ (returns: { latest_version, timestamp, content_hash })
-  ↓ Compare with local sync_metadata.last_sync_version
-  ↓ If server newer:
-    └→ GET /api/v1/sync/full (download all POIs, tours, audio URLs)
-    └→ ATOMIC: Delete local tables → Insert new data (all-or-nothing)
-    └→ Update sync_metadata.last_sync_version = server.latest_version
-  ↓ Else: Use local cache
+Web client GET /api/v1/pois?language=vi
+  ↓ (returns: live POI data)
+Web client GET /api/v1/tours
+  ↓ (returns: live tour data)
+Render directly from API responses
 ```
 
 ### 8.3 Read During Exploration
-- **All POI queries**: Use SQLite (never hit server)
-- **Audio playback**: Use cached MP3 files only
-- **No API dependency**: Network loss does not block exploration
+- **All POI queries**: Use API responses
+- **Audio playback**: Use fetched MP3 URLs
+- **No offline guarantee**: Network loss shows retry state
 
 ### 8.4 Atomic Guarantee
-- SQLite write must be **all-or-nothing** (BEGIN TRANSACTION → INSERT → COMMIT or ROLLBACK)
+- Browser-store write must be **all-or-nothing** (transaction or atomic replace)
 - Partial states forbidden (corrupted data = force resync)
 
-**Reference**: AI_GUIDELINES.md §3, USE_CASES.md UC8 (Offline Access), backend_design.md §3 (Sync Contract)
+**Reference**: AI_GUIDELINES.md §3, USE_CASES.md UC8 (Network Required Content Access), backend_design.md §3 (Delivery Contract)
 
 ## 9. Implementation Guardrails for AI Code Generation
 
 ### 9.1 Forbidden Patterns (DO NOT Implement)
 - ❌ **Geofencing** or background location tracking
 - ❌ **Auto-play** audio on any trigger except explicit user tap/QR scan
-- ❌ **Always-online** assumptions (cache audio locally, buffer analytics offline)
+- ❌ **Offline-only** assumptions (local mirrors, cached-only playback)
 - ❌ **Parallel narration** for two POIs (strict Single Voice Rule enforcement)
 - ❌ **Microservices** or Kafka/RabbitMQ (keep TTS in monolith job queue)
 - ❌ **On-device TTS** generation (backend-only, 15 languages per POI)
@@ -313,7 +414,7 @@ Mobile GET /api/v1/sync/manifest
 **CRITICAL**: A feature is NOT complete until tests are written and passing.  
 **Standards**:
 - **Unit Tests**: AAA pattern (Arrange-Act-Assert)
-- **Framework**: Jest (backend), Jest/Vitest (mobile)
+- **Framework**: Jest (backend), Vitest + Playwright (web)
 - **Coverage**: Minimum 70% per feature
 - **Test Cases**: Map to test_scenarios.md TC-*.* matrix
 - **CI/CD**: Tests must pass before PR merge
@@ -351,15 +452,15 @@ Mobile GET /api/v1/sync/manifest
 - **API Contract**: Client requests single language via query param `?language=vi`
 - **Fallback Chain**: Requested → English → Vietnamese
 
-### 10.3 Mobile Implementation
-- **Device Locale**: Auto-detect from system settings
+### 10.3 Web Implementation
+- **Browser Locale**: Auto-detect from system settings
 - **User Override**: Settings page allows manual language selection
-- **Persistence**: Store selection in SecureStore
+- **Persistence**: Store selection in localStorage
 - **API Request**: Use language query param (for example: `GET /api/v1/pois?language=ar`)
 
 ### 10.4 Backend TTS Generation
 - **Admin CMS**: Create POI with text in all 15 languages
-- **Backend Job**: Generate MP3 per language via Piper offline TTS
+- **Backend Job**: Generate MP3 per language via Piper TTS
 - **Storage**: `/audio/pois/{poiId}_{language}.mp3`
 - **Database**: Update `audio_urls` JSONB with all 15 URLs
 
@@ -387,14 +488,14 @@ Mobile GET /api/v1/sync/manifest
 
 ## 12. Admin CMS Rules (Canonical for Backend & AI Codegen)
 
-**Scope**: Admin Dashboard is a **separate Web CMS** (not in mobile app).  
+**Scope**: Admin Dashboard is a **separate Web CMS** (not in the user web app).  
 All codegen for Admin features must follow these invariants:
 
 ### 12.1 Non-Negotiable Admin Invariants
 #### 12.1.1 Server-Side TTS Generation Only
 - **Admin action**: Create/Edit POI → Trigger background job
-- **Backend flow**: Call Piper offline TTS engine to generate MP3 for **15 languages**
-- **Mobile**: **Never** generates TTS (expo-av playback only, pre-generated files)
+- **Backend flow**: Call Piper TTS engine to generate MP3 for **15 languages**
+- **Web client**: **Never** generates TTS (browser audio playback only, pre-generated files)
 - **Audio storage**: Save `audioUrls` JSONB per language in `points_of_interest`
 - **Regeneration**: Provide "Regenerate Audio" button per POI (regenerate only changed languages)
 
@@ -402,8 +503,8 @@ All codegen for Admin features must follow these invariants:
 
 #### 12.1.2 Atomic Publish Flow
 - **Draft mode**: Admin edits POI/Tour, changes stored as unsigned
-- **Publish action**: Admin clicks "Publish" → `contentVersion` increments → Sync Manifest updates
-- **Mobile view**: Until Publish, mobile sees old `contentVersion`  
+- **Publish action**: Admin clicks "Publish" → `contentVersion` increments → API-visible content updates
+- **Web view**: Until Publish, web client sees old `contentVersion`  
 - **Consistency**: All changes become visible atomically across all users
 
 **Reference**: backend_design.md §2.1 (API Endpoints — POST /api/v1/pois/{id}/publish)
@@ -414,13 +515,13 @@ All codegen for Admin features must follow these invariants:
 - **Versioning**: Increment `content_version` on any publish
 - **Testing**: Validate audio URLs resolve before allowing publish
 
-#### 12.1.4 No Impact on Mobile User Rules
+#### 12.1.4 No Impact on Web User Rules
 - Admin CRUD **MUST NOT** violate user constraints:
   - ❌ Single Voice Rule still enforced
   - ❌ User-trigger only (Tap/QR) — no auto-play on admin update
-  - ❌ Offline-first — mobile reads SQLite, not API
+  - ❌ Local mirror usage — web client reads local mirror instead of API responses
   - ❌ Foreground GPS only — no new geofences
-- **Backend role**: Data provider; Mobile reads from SQLite Mirror (never bypasses)
+- **Backend role**: Data provider; Web client reads from API responses (never bypasses)
 
 ### 12.2 Related Documentation
 - **Full Admin Spec**: docs/prd/15_admin_requirements.md
@@ -433,7 +534,7 @@ All codegen for Admin features must follow these invariants:
 2. ✅ `contentVersion` incremented on publish
 3. ✅ Sync manifest updated after publish
 4. ✅ Audio URLs saved to `audio_urls` JSONB
-5. ✅ Mobile continues to use SQLite (no direct Admin API calls)
+5. ✅ Web client continues to use API responses (no direct Admin API calls)
 6. ✅ Tests validate publish flow, audio availability, version incrementing
 
 ---
