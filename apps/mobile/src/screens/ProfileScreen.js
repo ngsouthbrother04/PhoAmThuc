@@ -13,12 +13,15 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API from '../api/api';
-import { useTranslation } from 'react-i18next';
-import '../i18n/i18n'; // Import file cấu hình
-export default function ProfileScreen({ navigation }) {
+import { autoTranslate } from "../utils/translator"; // Import hàm dịch của bạn
+
+export default function ProfileScreen({ navigation, route }) {
+  // 1. Nhận ngôn ngữ từ HomeScreen truyền sang (mặc định là vi)
+  const { currentLang } = route.params || { currentLang: { code: 'vi', locale: 'vi-VN' } };
+
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const { t, i18n } = useTranslation();
+  
   // State mật khẩu
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -27,32 +30,72 @@ export default function ProfileScreen({ navigation }) {
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [loadingPass, setLoadingPass] = useState(false);
 
+  // 2. State lưu trữ các nhãn giao diện (Labels)
+  const [labels, setLabels] = useState({
+    profileHeader: "THÔNG TIN CÁ NHÂN",
+    emailLabel: "Email (Tài khoản)",
+    nameLabel: "Họ và tên",
+    placeholderName: "Nhập tên mới...",
+    btnUpdate: "CẬP NHẬT TÊN",
+    securityHeader: "BẢO MẬT MẬT KHẨU",
+    oldPassLabel: "Mật khẩu cũ",
+    oldPassPlaceholder: "Nhập mật khẩu hiện tại",
+    newPassLabel: "Mật khẩu mới",
+    newPassPlaceholder: "Nhập mật khẩu mới",
+    confirmPassLabel: "Xác nhận mật khẩu mới",
+    confirmPassPlaceholder: "Nhập lại mật khẩu mới",
+    btnChangePass: "ĐỔI MẬT KHẨU",
+    loadingText: "Đang tải..."
+  });
+
   useEffect(() => {
     loadData();
+    translateUI(); // Gọi dịch giao diện ngay khi vào màn hình
   }, []);
-    const changeLanguage = (lng) => {
-    i18n.changeLanguage(lng); // Hàm này sẽ đổi ngôn ngữ toàn App ngay lập tức
+
+  // 3. Hàm dịch động toàn bộ giao diện dựa trên currentLang
+  const translateUI = async () => {
+    if (currentLang.code === 'vi') return; // Nếu là tiếng Việt thì giữ nguyên
+
+    try {
+      const keys = Object.keys(labels);
+      const values = Object.values(labels);
+
+      // Dịch mảng các giá trị nhãn
+      const translatedValues = await Promise.all(
+        values.map(val => autoTranslate(val, currentLang.code))
+      );
+
+      const newLabels = {};
+      keys.forEach((key, index) => {
+        newLabels[key] = translatedValues[index];
+      });
+      setLabels(newLabels);
+
+      // Dịch luôn cả tiêu đề Header của Navigation
+      const translatedTitle = await autoTranslate("Thông tin cá nhân", currentLang.code);
+      navigation.setOptions({ title: `👤 ${translatedTitle}` });
+    } catch (e) {
+      console.log("Lỗi dịch giao diện Profile:", e);
+    }
   };
+
   const loadData = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await API.get("/users/profile", {
+      const response = await API.get("/auth/profile", {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // Kiểm tra log ở terminal debug
-      console.log("DỮ LIỆU SERVER TRẢ VỀ:", response.data);
-
       if (response.data && response.data.data) {
-        setFullName(response.data.data.fullName);
-        setEmail(response.data.data.email);
-        
-        // Cập nhật lại local để các màn hình khác (Home) cũng nhận tên mới
-        await AsyncStorage.setItem('userName', response.data.data.fullName);
-        await AsyncStorage.setItem('userEmail', response.data.data.email);
+        const name = response.data.data.fullName || "Khách du lịch";
+        const mail = response.data.data.email || "";
+        setFullName(name);
+        setEmail(mail);
+        await AsyncStorage.setItem('userName', name);
+        await AsyncStorage.setItem('userEmail', mail);
       }
     } catch (e) {
-      console.log("Lỗi tải thông tin (sử dụng dữ liệu local):", e);
       const sName = await AsyncStorage.getItem('userName');
       const sEmail = await AsyncStorage.getItem('userEmail');
       if (sName) setFullName(sName);
@@ -60,166 +103,116 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
-  // HÀM 1: CẬP NHẬT HỌ TÊN
   const handleUpdateName = async () => {
     if (!fullName.trim()) {
-      Alert.alert("Lỗi", "Họ tên không được để trống.");
+      Alert.alert("Error", "Name cannot be empty");
       return;
     }
-
     setLoadingProfile(true);
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await API.patch("/users/profile", {
-        fullName: fullName.trim(),
-      }, {
+      await API.patch("/users/profile", { fullName: fullName.trim() }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-
-      if (response.status === 200 || response.status === 204) {
-        await AsyncStorage.setItem('userName', fullName.trim());
-        Alert.alert("Thành công", "Đã cập nhật họ tên mới!");
-      }
+      await AsyncStorage.setItem('userName', fullName.trim());
+      Alert.alert("Success", "Name updated!");
     } catch (error) {
-      console.log("Lỗi Update Name:", error.response?.data || error.message);
-      Alert.alert("Lỗi", "Không thể cập nhật tên. Vui lòng kiểm tra Server.");
+      Alert.alert("Error", "Update failed");
     } finally {
       setLoadingProfile(false);
     }
   };
 
-  // HÀM 2: ĐỔI MẬT KHẨU
   const handleChangePassword = async () => {
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      Alert.alert("Lỗi", "Vui lòng nhập đầy đủ các ô mật khẩu.");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      Alert.alert("Lỗi", "Mật khẩu xác nhận không khớp.");
-      return;
-    }
-    if (newPassword.length < 6) {
-      Alert.alert("Lỗi", "Mật khẩu mới phải từ 6 ký tự trở lên.");
-      return;
-    }
-
+    if (!oldPassword || !newPassword || !confirmPassword) return;
     setLoadingPass(true);
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const response = await API.post("/users/change-password", {
-        oldPassword: oldPassword,
-        newPassword: newPassword
-      }, {
+      await API.post("/users/change-password", { oldPassword, newPassword }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-
-      if (response.status === 200) {
-        setOldPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        Alert.alert("Thành công", "Mật khẩu đã được thay đổi.");
-      }
+      Alert.alert("Success", "Password changed");
+      setOldPassword(''); setNewPassword(''); setConfirmPassword('');
     } catch (error) {
-      const msg = error.response?.data?.message || "Mật khẩu cũ không đúng.";
-      Alert.alert("Thất bại", msg);
+      Alert.alert("Error", "Current password incorrect");
     } finally {
       setLoadingPass(false);
     }
   };
 
   return (
-    
     <KeyboardAvoidingView 
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0} 
     >
       <ScrollView 
         style={styles.container} 
         contentContainerStyle={{ paddingBottom: 60 }} 
         showsVerticalScrollIndicator={false}
       >
-        {/* Avatar & Email Header */}
         <View style={styles.header}>
           <View style={styles.avatarLarge}>
             <Text style={styles.avatarTextLarge}>
               {fullName ? fullName.charAt(0).toUpperCase() : 'U'}
             </Text>
           </View>
-          <Text style={styles.headerEmail}>{email || "Đang tải..."}</Text>
+          <Text style={styles.headerEmail}>{email || labels.loadingText}</Text>
         </View>
 
         <View style={styles.form}>
-          <Text style={styles.sectionTitle}>👤 THÔNG TIN CÁ NHÂN</Text>
+          <Text style={styles.sectionTitle}>👤 {labels.profileHeader}</Text>
           
-          <Text style={styles.label}>Email (Tài khoản)</Text>
-          <TextInput 
-            style={[styles.input, styles.disabledInput]} 
-            value={email} 
-            editable={false} 
-          />
+          <Text style={styles.label}>{labels.emailLabel}</Text>
+          <TextInput style={[styles.input, styles.disabledInput]} value={email} editable={false} />
 
-          <Text style={styles.label}>Họ và tên</Text>
+          <Text style={styles.label}>{labels.nameLabel}</Text>
           <TextInput 
             style={styles.input} 
             value={fullName} 
             onChangeText={setFullName}
-            placeholder="Nhập tên mới..."
+            placeholder={labels.placeholderName}
           />
           
-          <TouchableOpacity 
-            style={styles.smallBtn} 
-            onPress={handleUpdateName} 
-            disabled={loadingProfile}
-          >
-            {loadingProfile ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.btnText}>CẬP NHẬT TÊN</Text>
-            )}
+          <TouchableOpacity style={styles.smallBtn} onPress={handleUpdateName}>
+            {loadingProfile ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>{labels.btnUpdate}</Text>}
           </TouchableOpacity>
 
           <View style={styles.divider} />
 
-          <Text style={styles.sectionTitle}>🔑 BẢO MẬT MẬT KHẨU</Text>
+          <Text style={styles.sectionTitle}>🔑 {labels.securityHeader}</Text>
 
-          <Text style={styles.label}>Mật khẩu cũ</Text>
+          <Text style={styles.label}>{labels.oldPassLabel}</Text>
           <TextInput 
             style={styles.input} 
             secureTextEntry 
             value={oldPassword}
             onChangeText={setOldPassword}
-            placeholder="Nhập mật khẩu hiện tại"
+            placeholder={labels.oldPassPlaceholder}
           />
 
-          <Text style={styles.label}>Mật khẩu mới</Text>
+          <Text style={styles.label}>{labels.newPassLabel}</Text>
           <TextInput 
             style={styles.input} 
             secureTextEntry 
             value={newPassword}
             onChangeText={setNewPassword}
-            placeholder="Nhập mật khẩu mới"
+            placeholder={labels.newPassPlaceholder}
           />
 
-          <Text style={styles.label}>Xác nhận mật khẩu mới</Text>
+          <Text style={styles.label}>{labels.confirmPassLabel}</Text>
           <TextInput 
             style={styles.input} 
             secureTextEntry 
             value={confirmPassword}
             onChangeText={setConfirmPassword}
-            placeholder="Nhập lại mật khẩu mới"
+            placeholder={labels.confirmPassPlaceholder}
           />
 
           <TouchableOpacity 
-            style={[styles.smallBtn, {backgroundColor: '#333', marginBottom: 20}]} 
-            onPress={handleChangePassword} 
-            disabled={loadingPass}
+            style={[styles.smallBtn, {backgroundColor: '#333'}]} 
+            onPress={handleChangePassword}
           >
-            {loadingPass ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.btnText}>ĐỔI MẬT KHẨU</Text>
-            )}
+            {loadingPass ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>{labels.btnChangePass}</Text>}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -230,19 +223,7 @@ export default function ProfileScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { alignItems: 'center', padding: 30, backgroundColor: '#FFF3E0' },
-  avatarLarge: { 
-    width: 80, 
-    height: 80, 
-    borderRadius: 40, 
-    backgroundColor: '#FF6F00', 
-    justifyContent: 'center', 
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
+  avatarLarge: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#FF6F00', justifyContent: 'center', alignItems: 'center', elevation: 4 },
   avatarTextLarge: { color: '#fff', fontSize: 30, fontWeight: 'bold' },
   headerEmail: { marginTop: 10, color: '#666', fontWeight: '500', fontSize: 16 },
   form: { padding: 20 },

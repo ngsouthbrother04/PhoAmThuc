@@ -3,12 +3,12 @@ import {
   View, Text, StyleSheet, Dimensions, TextInput, 
   ScrollView, TouchableOpacity, FlatList, ActivityIndicator, Modal, Alert, StatusBar 
 } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE, Circle } from "react-native-maps";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Speech from 'expo-speech';
 import { CommonActions } from '@react-navigation/native';
 import API from "../api/api";
-import { autoTranslate } from "../utils/translator"; // Đảm bảo import đúng đường dẫn
+import { autoTranslate } from "../utils/translator";
 
 const { width, height } = Dimensions.get("window");
 
@@ -21,13 +21,26 @@ const LANGUAGES = [
   { code: 'fr', name: 'Français', flag: '🇫🇷', locale: 'fr-FR' },
 ];
 
+const getDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371e3; 
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; 
+};
+
 export default function HomeScreen({ navigation }) {
-  // --- STATES ---
   const [pois, setPois] = useState([]);
   const [filteredPois, setFilteredPois] = useState([]);
   const [selectedPoi, setSelectedPoi] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+  const [userLocation, setUserLocation] = useState({ latitude: 10.7712, longitude: 106.6901 });
+
   const [searchQuery, setSearchQuery] = useState("");
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
   const [isMenuVisible, setIsMenuVisible] = useState(false);
@@ -38,10 +51,23 @@ export default function HomeScreen({ navigation }) {
   const [isTranslating, setIsTranslating] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
+  // --- STATE LƯU TRỮ CÁC NHÃN GIAO DIỆN ĐÃ DỊCH ---
+  const [uiLabels, setUiLabels] = useState({
+    searchPlaceholder: "Tìm kiếm địa điểm...",
+    profileTitle: "Trang cá nhân",
+    profileLink: "Hồ sơ cá nhân",
+    logout: "Đăng xuất",
+    details: "THÔNG TIN CHI TIẾT",
+    listen: "🔊 NGHE THUYẾT MINH",
+    stop: "⏹ DỪNG PHÁT",
+    closeMenu: "Đóng menu",
+    langTitle: "Chọn Ngôn Ngữ"
+  });
+
   const [userData, setUserData] = useState({ name: "Người dùng", email: "" });
   const mapRef = useRef(null);
-
-  // --- LOGIC ---
+  const lastPlayedPoiId = useRef(null);
+  const lastPlayedTimestamp = useRef({});
 
   useEffect(() => {
     fetchPois();
@@ -50,15 +76,180 @@ export default function HomeScreen({ navigation }) {
     return unsubscribe;
   }, [navigation]);
 
-  // Tự động dịch mỗi khi đổi Địa điểm hoặc đổi Ngôn ngữ
+  // --- TỰ ĐỘNG DỊCH TOÀN BỘ GIAO DIỆN KHI ĐỔI NGÔN NGỮ ---
+  useEffect(() => {
+    const translateUI = async () => {
+      if (lang.code === 'vi') {
+        // 1. Cập nhật nhãn trong màn hình
+        setUiLabels({
+          searchPlaceholder: "Tìm kiếm địa điểm...",
+          profileTitle: "Trang cá nhân",
+          profileLink: "Hồ sơ cá nhân",
+          logout: "Đăng xuất",
+          details: "THÔNG TIN CHI TIẾT",
+          listen: "🔊 NGHE THUYẾT MINH",
+          stop: "⏹ DỪNG PHÁT",
+          closeMenu: "Đóng menu",
+          langTitle: "Chọn Ngôn Ngữ"
+        });
+
+        // 2. ÉP TIÊU ĐỀ HEADER VỀ TIẾNG VIỆT
+        navigation.setOptions({ title: "🏠 Trang chủ" });
+
+      } else {
+        try {
+          // Dịch các nhãn UI hiện có
+          const keys = Object.keys(uiLabels);
+          const values = Object.values(uiLabels);
+          const translatedValues = await Promise.all(
+            values.map(val => autoTranslate(val.replace(/🔊 |⏹ /g, ""), lang.code))
+          );
+          
+          const newLabels = {};
+          keys.forEach((key, index) => {
+            let prefix = "";
+            if (key === "listen") prefix = "🔊 ";
+            if (key === "stop") prefix = "⏹ ";
+            newLabels[key] = prefix + translatedValues[index];
+          });
+          setUiLabels(newLabels);
+
+          // 3. DỊCH VÀ ÉP TIÊU ĐỀ HEADER SANG NGÔN NGỮ MỚI
+          const translatedHome = await autoTranslate("Trang chủ", lang.code);
+          navigation.setOptions({ title: `🏠 ${translatedHome}` });
+
+        } catch (e) { 
+          console.log("Lỗi dịch UI:", e); 
+        }
+      }
+    };
+    translateUI();
+  }, [lang]);
+
   useEffect(() => {
     if (selectedPoi) handleAutoTranslate();
   }, [selectedPoi, lang]);
 
+  useEffect(() => {
+    checkGeofencing();
+  }, [userLocation]);
+
+const checkGeofencing = async () => {
+  const now = Date.now();
+  let nearestPoi = null;
+  let minDistance = 101; // Bắt đầu lớn hơn bán kính 100m một chút
+
+  // BƯỚC 1: Tìm POI gần bạn nhất trong bán kính 100m
+  for (let poi of pois) {
+    const dist = getDistance(userLocation.latitude, userLocation.longitude, poi.latitude, poi.longitude);
+    
+    if (dist <= 100) {
+      if (dist < minDistance) {
+        minDistance = dist;
+        nearestPoi = poi;
+      }
+    }
+  }
+
+  // BƯỚC 2: Nếu tìm thấy POI gần nhất, kiểm tra Cooldown và Phát
+  if (nearestPoi) {
+    const poi = nearestPoi;
+    const timeSinceLastPlay = now - (lastPlayedTimestamp.current[poi.id] || 0);
+
+    // Quy tắc Cooldown 30s HOẶC chuyển từ POI khác sang POI này
+    if (timeSinceLastPlay > 30000 || lastPlayedPoiId.current !== poi.id) {
+      const isSamePoi = lastPlayedPoiId.current === poi.id;
+      
+      lastPlayedPoiId.current = poi.id;
+      lastPlayedTimestamp.current[poi.id] = now;
+      
+      setSelectedPoi(poi); 
+
+      if (isSamePoi) {
+        handleAutoTranslate(poi); 
+      }
+
+      // Thông báo Alert đã dịch
+      let title = "📍 Vào vùng ảnh hưởng";
+      let near = "Bạn đang ở gần";
+      if (lang.code !== 'vi') {
+        try {
+          title = await autoTranslate(title, lang.code);
+          near = await autoTranslate(near, lang.code);
+        } catch (e) {}
+      }
+      Alert.alert(title, `${near} ${poi.name?.vi || poi.name || poi.name}.`);
+    }
+  }
+};
+
+  const playSpeech = (text) => {
+    if (!text) return;
+    Speech.stop();
+    setIsSpeaking(true);
+    Speech.speak(text, { language: lang.locale, rate: 0.9, onDone: () => setIsSpeaking(false) });
+  };
+
+  const handleAutoTranslate = async (targetPoi) => {
+    const poiToUse = targetPoi || selectedPoi;
+    if (!poiToUse) return;
+
+    const originName = poiToUse.name?.vi || poiToUse.name || "";
+    const originDesc = poiToUse.description?.vi || poiToUse.description || "";
+
+    let finalName = originName;
+    let finalDesc = originDesc;
+
+    if (lang.code !== 'vi') {
+      setIsTranslating(true);
+      try {
+        const [tName, tDesc] = await Promise.all([
+          autoTranslate(originName, lang.code),
+          autoTranslate(originDesc, lang.code)
+        ]);
+        finalName = tName;
+        finalDesc = tDesc;
+      } catch (e) { console.log(e); } finally { setIsTranslating(false); }
+    }
+
+    setTranslatedData({ name: finalName, desc: finalDesc });
+
+    const dist = getDistance(userLocation.latitude, userLocation.longitude, poiToUse.latitude, poiToUse.longitude);
+    if (dist <= 100 && lastPlayedPoiId.current === poiToUse.id) {
+      playSpeech(finalDesc);
+    }
+  };
+
+  const handleSearch = async (text) => {
+    setSearchQuery(text);
+    if (!text) { setFilteredPois(pois); setIsDropdownVisible(false); return; }
+
+    const filtered = [];
+    for (let p of pois) {
+      const nameVi = (p.name?.vi || p.name || "").toLowerCase();
+      if (nameVi.includes(text.toLowerCase())) { filtered.push(p); continue; }
+      if (lang.code !== 'vi') {
+        const translatedName = (await autoTranslate(p.name?.vi || p.name, lang.code)).toLowerCase();
+        if (translatedName.includes(text.toLowerCase())) { filtered.push(p); }
+      }
+    }
+    setFilteredPois(filtered);
+    setIsDropdownVisible(true);
+  };
+
   const loadUserData = async () => {
-    const name = await AsyncStorage.getItem('userName') || "Khách du lịch";
-    const email = await AsyncStorage.getItem('userEmail') || "";
-    setUserData({ name, email });
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await API.get("/auth/profile", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data?.status === "success") {
+        const name = res.data.data.fullName || "Khách du lịch";
+        setUserData({ name, email: res.data.data.email || "" });
+      }
+    } catch (e) { 
+        const n = await AsyncStorage.getItem('userName') || "Khách du lịch";
+        const em = await AsyncStorage.getItem('userEmail') || "";
+        setUserData({name: n, email: em});
+    }
   };
 
   const fetchPois = async () => {
@@ -67,67 +258,28 @@ export default function HomeScreen({ navigation }) {
       const token = await AsyncStorage.getItem('userToken');
       const res = await API.get("/pois", { headers: { Authorization: `Bearer ${token}` } });
       if (res.data?.data?.items) {
-        const items = res.data.data.items;
-        setPois(items);
-        setFilteredPois(items);
-        if (items.length > 0) setSelectedPoi(items[0]);
+        setPois(res.data.data.items);
+        setFilteredPois(res.data.data.items);
       }
-    } catch (err) {
-      console.log("Lỗi tải POI:", err);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.log(e); } finally { setLoading(false); }
   };
 
-  const handleAutoTranslate = async () => {
-    // Lưu ý: Sửa .name?.vi thành .name nếu bạn đã đổi DB sang String
-    const originName = selectedPoi.name?.vi || selectedPoi.name || "";
-    const originDesc = selectedPoi.description?.vi || selectedPoi.description || "";
-
-    if (lang.code === 'vi') {
-      setTranslatedData({ name: originName, desc: originDesc });
-      return;
-    }
-
-    setIsTranslating(true);
-    try {
-      const [tName, tDesc] = await Promise.all([
-        autoTranslate(originName, lang.code),
-        autoTranslate(originDesc, lang.code)
-      ]);
-      setTranslatedData({ name: tName, desc: tDesc });
-    } catch (e) {
-      setTranslatedData({ name: originName, desc: originDesc });
-    } finally {
-      setIsTranslating(false);
-    }
-  };
-
-  const handleToggleSpeech = async () => {
-    if (!translatedData.desc) return;
-    const speaking = await Speech.isSpeakingAsync();
-    
-    if (speaking || isSpeaking) {
-      await Speech.stop();
-      setIsSpeaking(false);
-      return;
-    }
-
-    setIsSpeaking(true);
-    Speech.speak(translatedData.desc, {
-      language: lang.locale,
-      rate: 0.9,
-      onDone: () => setIsSpeaking(false),
-      onStopped: () => setIsSpeaking(false),
-      onError: () => setIsSpeaking(false),
-    });
+  const handleToggleSpeech = () => {
+    if (isSpeaking) { Speech.stop(); setIsSpeaking(false); }
+    else playSpeech(translatedData.desc);
   };
 
   const handleLogout = async () => {
     setIsMenuVisible(false);
-    Alert.alert("Đăng xuất", "Bạn có chắc chắn muốn thoát?", [
-      { text: "Hủy", style: "cancel" },
-      { text: "Đăng xuất", onPress: async () => {
+    let logoutTitle = "Đăng xuất";
+    let logoutMsg = "Bạn có chắc chắn muốn thoát?";
+    if (lang.code !== 'vi') {
+        logoutTitle = await autoTranslate(logoutTitle, lang.code);
+        logoutMsg = await autoTranslate(logoutMsg, lang.code);
+    }
+    Alert.alert(logoutTitle, logoutMsg, [
+      { text: "Cancel", style: "cancel" },
+      { text: logoutTitle, onPress: async () => {
         await Speech.stop();
         await AsyncStorage.clear();
         navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Login' }] }));
@@ -149,15 +301,10 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
           <View style={styles.searchBar}>
             <TextInput
-              placeholder={lang.code === 'vi' ? "Tìm kiếm địa điểm..." : "Search locations..."}
+              placeholder={uiLabels.searchPlaceholder}
               style={styles.input}
               value={searchQuery}
-              onChangeText={(t) => {
-                setSearchQuery(t);
-                const filtered = pois.filter(p => (p.name?.vi || p.name || "").toLowerCase().includes(t.toLowerCase()));
-                setFilteredPois(filtered);
-                setIsDropdownVisible(t.length > 0);
-              }}
+              onChangeText={handleSearch}
             />
           </View>
           <TouchableOpacity style={styles.roundBtn} onPress={() => setIsLangModalVisible(true)}>
@@ -169,16 +316,13 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.dropdown}>
             <FlatList
               data={filteredPois}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => item.id.toString()}
               renderItem={({ item }) => (
                 <TouchableOpacity style={styles.dropItem} onPress={() => {
                   setSelectedPoi(item);
                   setIsDropdownVisible(false);
                   setSearchQuery("");
-                  mapRef.current?.animateToRegion({
-                    latitude: item.latitude, longitude: item.longitude,
-                    latitudeDelta: 0.005, longitudeDelta: 0.005,
-                  }, 1000);
+                  mapRef.current?.animateToRegion({ latitude: item.latitude, longitude: item.longitude, latitudeDelta: 0.005, longitudeDelta: 0.005 }, 1000);
                 }}>
                   <Text style={styles.dropItemText}>{item.name?.vi || item.name}</Text>
                 </TouchableOpacity>
@@ -188,48 +332,49 @@ export default function HomeScreen({ navigation }) {
         )}
       </View>
 
-      {/* GOOGLE MAP */}
       <MapView 
         ref={mapRef} 
         style={styles.map} 
         provider={PROVIDER_GOOGLE}
+        onPress={(e) => setUserLocation(e.nativeEvent.coordinate)}
         initialRegion={{ latitude: 10.7712, longitude: 106.6901, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
       >
+        <Marker coordinate={userLocation} pinColor="blue" />
         {pois.map((p) => (
-          <Marker key={p.id} coordinate={{ latitude: p.latitude, longitude: p.longitude }} onPress={() => setSelectedPoi(p)}>
-            <View style={[styles.customMarker, selectedPoi?.id === p.id && styles.activeMarker]}>
-              <Text style={{fontSize: 14}}>📍</Text>
-            </View>
-          </Marker>
+          <React.Fragment key={p.id}>
+            <Circle 
+              center={{ latitude: p.latitude, longitude: p.longitude }}
+              radius={100}
+              strokeColor="rgba(255, 111, 0, 0.5)"
+              fillColor="rgba(255, 111, 0, 0.2)"
+            />
+            <Marker coordinate={{ latitude: p.latitude, longitude: p.longitude }} onPress={() => setSelectedPoi(p)}>
+              <View style={[styles.customMarker, selectedPoi?.id === p.id && styles.activeMarker]}>
+                <Text style={{fontSize: 14}}>📍</Text>
+              </View>
+            </Marker>
+          </React.Fragment>
         ))}
       </MapView>
 
-      {/* BOTTOM INFO CARD */}
       <View style={styles.infoContainer}>
         <View style={styles.handle} />
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{padding: 25}}>
-          {isTranslating ? (
-            <View style={{height: 100, justifyContent: 'center'}}><ActivityIndicator color="#FF6F00" /></View>
-          ) : (
-            <>
-              <View style={styles.badge}><Text style={styles.badgeText}>{selectedPoi?.type || 'LOCAL FOOD'}</Text></View>
-              <Text style={styles.poiName}>{translatedData.name}</Text>
-              <View style={styles.divider} />
-              <Text style={styles.descLabel}>{lang.code === 'vi' ? "THÔNG TIN CHI TIẾT" : "DETAILS"}</Text>
-              <Text style={styles.poiDesc}>{translatedData.desc}</Text>
-              
-              <TouchableOpacity style={[styles.audioBtn, isSpeaking && styles.audioBtnActive]} onPress={handleToggleSpeech}>
-                <Text style={[styles.audioBtnText, isSpeaking && {color: '#fff'}]}>
-                  {isSpeaking ? "⏹ STOP SPEAKING" : `🔊 LISTEN (${lang.name.toUpperCase()})`}
-                </Text>
-              </TouchableOpacity>
-            </>
-          )}
+        <ScrollView contentContainerStyle={{padding: 25}}>
+          <View style={styles.badge}><Text style={styles.badgeText}>{selectedPoi?.type || 'DESTINATION'}</Text></View>
+          <Text style={styles.poiName}>{translatedData.name}</Text>
+          <View style={styles.divider} />
+          <Text style={styles.descLabel}>{uiLabels.details}</Text>
+          <Text style={styles.poiDesc}>{translatedData.desc}</Text>
+          <TouchableOpacity style={[styles.audioBtn, isSpeaking && styles.audioBtnActive]} onPress={handleToggleSpeech}>
+            <Text style={[styles.audioBtnText, isSpeaking && {color: '#fff'}]}>
+              {isSpeaking ? uiLabels.stop : uiLabels.listen}
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </View>
 
-      {/* SIDE MENU MODAL */}
-      <Modal visible={isMenuVisible} animationType="slide" transparent onRequestClose={() => setIsMenuVisible(false)}>
+      {/* SIDE MENU MODAL - CÁC NHÃN ĐÃ ĐƯỢC THAY BẰNG uiLabels */}
+      <Modal visible={isMenuVisible} animationType="slide" transparent>
         <View style={styles.menuOverlay}>
           <View style={styles.menuSideBar}>
             <View style={styles.menuHeader}>
@@ -238,14 +383,23 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.menuEmail}>{userData.email}</Text>
             </View>
             <View style={styles.menuBody}>
-              <TouchableOpacity style={styles.menuItem} onPress={() => { setIsMenuVisible(false); navigation.navigate('Profile'); }}>
-                <Text style={styles.menuItemIcon}>👤</Text><Text style={styles.menuItemText}>Hồ sơ cá nhân</Text>
-              </TouchableOpacity>
+              <Text style={styles.menuTitleSection}>{uiLabels.profileTitle}</Text>
+            <TouchableOpacity 
+              style={styles.menuItem} 
+              onPress={() => { 
+                setIsMenuVisible(false); 
+                // Gửi kèm thông tin ngôn ngữ hiện tại sang Profile
+                navigation.navigate('Profile', { currentLang: lang }); 
+              }}
+            >
+              <Text style={styles.menuItemIcon}>👤</Text>
+              <Text style={styles.menuItemText}>{uiLabels.profileLink}</Text>
+            </TouchableOpacity>
               <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
-                <Text style={styles.menuItemIcon}>🚪</Text><Text style={[styles.menuItemText, {color: '#FF3B30'}]}>Đăng xuất</Text>
+                <Text style={styles.menuItemIcon}>🚪</Text><Text style={[styles.menuItemText, {color: '#FF3B30'}]}>{uiLabels.logout}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.closeMenuBtn} onPress={() => setIsMenuVisible(false)}>
-                <Text style={{color: '#666'}}>Đóng menu</Text>
+                <Text style={{color: '#666'}}>{uiLabels.closeMenu}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -253,11 +407,11 @@ export default function HomeScreen({ navigation }) {
         </View>
       </Modal>
 
-      {/* LANGUAGE SELECTION MODAL */}
+      {/* LANGUAGE MODAL */}
       <Modal visible={isLangModalVisible} animationType="fade" transparent>
         <View style={styles.modalBg}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Chọn Ngôn Ngữ / Language</Text>
+            <Text style={styles.modalTitle}>{uiLabels.langTitle}</Text>
             <FlatList
               data={LANGUAGES}
               numColumns={2}
@@ -312,6 +466,7 @@ const styles = StyleSheet.create({
   menuName: { fontSize: 20, fontWeight: 'bold' },
   menuEmail: { color: '#666', fontSize: 12 },
   menuBody: { padding: 20 },
+  menuTitleSection: { fontSize: 12, color: '#999', fontWeight: 'bold', marginBottom: 10, letterSpacing: 1 },
   menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 0.5, borderBottomColor: '#F0F0F0' },
   menuItemIcon: { fontSize: 20, marginRight: 15 },
   menuItemText: { fontSize: 16, fontWeight: '500' },
