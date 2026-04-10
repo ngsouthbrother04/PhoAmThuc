@@ -1,9 +1,12 @@
-import { PoiType, Prisma } from '../generated/prisma/client';
-import prisma from '../lib/prisma';
-import ApiError from '../utils/ApiError';
-import { cleanupPoiAudioFiles, enqueuePoiTtsGeneration } from './ttsService';
-import { removeCloudinaryImageByUrl } from './imageService';
-import { recordAdminAuditEvent } from './adminAuditService';
+import { PoiType, Prisma } from "../generated/prisma/client";
+import prisma from "../lib/prisma";
+import ApiError from "../utils/ApiError";
+import { cleanupPoiAudioFiles, enqueuePoiTtsGeneration } from "./ttsService";
+import { removeCloudinaryImageByUrl } from "./imageService";
+import { recordAdminAuditEvent } from "./adminAuditService";
+import { generateMultiLanguageAudioForPoi } from "./poiAudioGenerationService";
+import { ensurePoiLocalizedTextMap } from "./poiTranslationService";
+import { POI_TARGET_LANGUAGES } from "./poiLanguageConfig";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
@@ -100,11 +103,13 @@ const POI_TYPE_VALUES = new Set<string>(Object.values(PoiType));
 
 let softDeleteCleanupTimer: NodeJS.Timeout | null = null;
 
-function normalizeActionContext(context?: AdminActionContext): Required<AdminActionContext> {
+function normalizeActionContext(
+  context?: AdminActionContext,
+): Required<AdminActionContext> {
   return {
-    actor: context?.actor?.trim() || 'unknown',
-    reason: context?.reason?.trim() || 'unspecified',
-    source: context?.source?.trim() || 'api'
+    actor: context?.actor?.trim() || "unknown",
+    reason: context?.reason?.trim() || "unspecified",
+    source: context?.source?.trim() || "api",
   };
 }
 
@@ -118,7 +123,9 @@ function getSoftDeleteRetentionDays(): number {
 }
 
 function getSoftDeleteCleanupIntervalMs(): number {
-  const rawHours = Number(process.env.POI_SOFT_DELETE_CLEANUP_INTERVAL_HOURS ?? 24);
+  const rawHours = Number(
+    process.env.POI_SOFT_DELETE_CLEANUP_INTERVAL_HOURS ?? 24,
+  );
   if (!Number.isFinite(rawHours) || rawHours <= 0) {
     return 24 * 60 * 60 * 1000;
   }
@@ -126,8 +133,11 @@ function getSoftDeleteCleanupIntervalMs(): number {
   return Math.floor(rawHours * 60 * 60 * 1000);
 }
 
-function normalizeTextMap(value: unknown, fieldName: string): Record<string, string> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+function normalizeTextMap(
+  value: unknown,
+  fieldName: string,
+): Record<string, string> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new ApiError(400, `${fieldName} phải là object JSON hợp lệ.`);
   }
 
@@ -138,8 +148,11 @@ function normalizeTextMap(value: unknown, fieldName: string): Record<string, str
 
   const normalized: Record<string, string> = {};
   for (const [language, rawText] of entries) {
-    if (typeof rawText !== 'string' || !rawText.trim()) {
-      throw new ApiError(400, `${fieldName}.${language} phải là chuỗi không rỗng.`);
+    if (typeof rawText !== "string" || !rawText.trim()) {
+      throw new ApiError(
+        400,
+        `${fieldName}.${language} phải là chuỗi không rỗng.`,
+      );
     }
 
     normalized[language.trim()] = rawText.trim();
@@ -152,16 +165,25 @@ function getSortedLanguageKeys(value: Record<string, string>): string[] {
   return Object.keys(value).sort((a, b) => a.localeCompare(b));
 }
 
-function assertMatchingLanguageSets(name: Record<string, string>, description: Record<string, string>): void {
+function assertMatchingLanguageSets(
+  name: Record<string, string>,
+  description: Record<string, string>,
+): void {
   const nameKeys = getSortedLanguageKeys(name);
   const descriptionKeys = getSortedLanguageKeys(description);
 
-  if (nameKeys.length !== descriptionKeys.length || nameKeys.some((key, index) => key !== descriptionKeys[index])) {
-    throw new ApiError(400, 'name và description phải có cùng tập ngôn ngữ.');
+  if (
+    nameKeys.length !== descriptionKeys.length ||
+    nameKeys.some((key, index) => key !== descriptionKeys[index])
+  ) {
+    throw new ApiError(400, "name và description phải có cùng tập ngôn ngữ.");
   }
 }
 
-function assertAudioUrlsAligned(audioUrls: Record<string, string>, languages: Record<string, string>): void {
+function assertAudioUrlsAligned(
+  audioUrls: Record<string, string>,
+  languages: Record<string, string>,
+): void {
   const languageSet = new Set(Object.keys(languages));
   const audioKeys = Object.keys(audioUrls);
 
@@ -174,7 +196,10 @@ function assertAudioUrlsAligned(audioUrls: Record<string, string>, languages: Re
     audioKeys.length !== languageSet.size;
 
   if (mismatch) {
-    throw new ApiError(400, 'audioUrls phải khớp toàn bộ ngôn ngữ của name/description.');
+    throw new ApiError(
+      400,
+      "audioUrls phải khớp toàn bộ ngôn ngữ của name/description.",
+    );
   }
 }
 
@@ -183,14 +208,19 @@ function normalizeAudioUrls(value: unknown): Record<string, string> {
     return {};
   }
 
-  if (typeof value !== 'object' || Array.isArray(value)) {
-    throw new ApiError(400, 'audioUrls phải là object JSON hợp lệ.');
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new ApiError(400, "audioUrls phải là object JSON hợp lệ.");
   }
 
   const normalized: Record<string, string> = {};
-  for (const [language, rawUrl] of Object.entries(value as Record<string, unknown>)) {
-    if (typeof rawUrl !== 'string' || !rawUrl.trim()) {
-      throw new ApiError(400, `audioUrls.${language} phải là chuỗi không rỗng.`);
+  for (const [language, rawUrl] of Object.entries(
+    value as Record<string, unknown>,
+  )) {
+    if (typeof rawUrl !== "string" || !rawUrl.trim()) {
+      throw new ApiError(
+        400,
+        `audioUrls.${language} phải là chuỗi không rỗng.`,
+      );
     }
 
     normalized[language.trim()] = rawUrl.trim();
@@ -200,15 +230,20 @@ function normalizeAudioUrls(value: unknown): Record<string, string> {
 }
 
 function normalizePoiType(value: unknown): PoiType {
-  if (typeof value !== 'string' || !POI_TYPE_VALUES.has(value)) {
-    throw new ApiError(400, 'type phải là một trong FOOD, DRINK, SNACK, WC.');
+  if (typeof value !== "string" || !POI_TYPE_VALUES.has(value)) {
+    throw new ApiError(400, "type phải là một trong FOOD, DRINK, SNACK, WC.");
   }
 
   return value as PoiType;
 }
 
 function normalizeNumericField(value: unknown, fieldName: string): number {
-  const numericValue = typeof value === 'string' ? Number(value) : typeof value === 'number' ? value : Number.NaN;
+  const numericValue =
+    typeof value === "string"
+      ? Number(value)
+      : typeof value === "number"
+        ? value
+        : Number.NaN;
 
   if (!Number.isFinite(numericValue)) {
     throw new ApiError(400, `${fieldName} phải là số hợp lệ.`);
@@ -226,8 +261,8 @@ function normalizeNullableString(value: unknown): string | null | undefined {
     return null;
   }
 
-  if (typeof value !== 'string') {
-    throw new ApiError(400, 'image phải là chuỗi hoặc null.');
+  if (typeof value !== "string") {
+    throw new ApiError(400, "image phải là chuỗi hoặc null.");
   }
 
   const trimmed = value.trim();
@@ -241,7 +276,7 @@ function normalizePoiIds(value: unknown, fieldName: string): string[] {
 
   const normalized: string[] = [];
   for (const rawId of value) {
-    if (typeof rawId !== 'string' || !rawId.trim()) {
+    if (typeof rawId !== "string" || !rawId.trim()) {
       throw new ApiError(400, `${fieldName} chỉ chứa chuỗi POI id không rỗng.`);
     }
 
@@ -261,15 +296,18 @@ function normalizeDuration(value: unknown): number {
     return 0;
   }
 
-  const duration = normalizeNumericField(value, 'duration');
+  const duration = normalizeNumericField(value, "duration");
   if (!Number.isInteger(duration) || duration < 0) {
-    throw new ApiError(400, 'duration phải là số nguyên không âm.');
+    throw new ApiError(400, "duration phải là số nguyên không âm.");
   }
 
   return duration;
 }
 
-async function assertExistingPoiIds(poiIds: string[], dbClient: DbClient = prisma): Promise<void> {
+async function assertExistingPoiIds(
+  poiIds: string[],
+  dbClient: DbClient = prisma,
+): Promise<void> {
   if (poiIds.length === 0) {
     return;
   }
@@ -277,23 +315,31 @@ async function assertExistingPoiIds(poiIds: string[], dbClient: DbClient = prism
   const existingPois = await dbClient.pointOfInterest.findMany({
     where: {
       id: { in: poiIds },
-      deletedAt: null
+      deletedAt: null,
     },
     select: {
-      id: true
-    }
+      id: true,
+    },
   });
 
   const existingSet = new Set(existingPois.map((poi) => poi.id));
   const missingPoiIds = poiIds.filter((poiId) => !existingSet.has(poiId));
   if (missingPoiIds.length > 0) {
-    throw new ApiError(400, `Danh sach POI khong hop le: ${missingPoiIds.join(', ')}.`);
+    throw new ApiError(
+      400,
+      `Danh sach POI khong hop le: ${missingPoiIds.join(", ")}.`,
+    );
   }
 }
 
-async function withOptionalTransaction<T>(dbClient: DbClient, executor: (tx: DbClient) => Promise<T>): Promise<T> {
+async function withOptionalTransaction<T>(
+  dbClient: DbClient,
+  executor: (tx: DbClient) => Promise<T>,
+): Promise<T> {
   if (dbClient === prisma) {
-    return prisma.$transaction(async (tx) => executor(tx as unknown as DbClient));
+    return prisma.$transaction(async (tx) =>
+      executor(tx as unknown as DbClient),
+    );
   }
 
   return executor(dbClient);
@@ -333,7 +379,7 @@ function toAdminPoiRecord(poi: {
     deletedAt: poi.deletedAt?.toISOString() ?? null,
     contentVersion: poi.contentVersion,
     createdAt: poi.createdAt.toISOString(),
-    updatedAt: poi.updatedAt.toISOString()
+    updatedAt: poi.updatedAt.toISOString(),
   };
 }
 
@@ -358,7 +404,7 @@ function toAdminTourRecord(tour: {
     duration: tour.duration,
     poiIds: Array.isArray(tour.poiIds)
       ? tour.poiIds
-          .filter((value): value is string => typeof value === 'string')
+          .filter((value): value is string => typeof value === "string")
           .map((value) => value.trim())
       : [],
     image: tour.image,
@@ -367,19 +413,21 @@ function toAdminTourRecord(tour: {
     deletedAt: tour.deletedAt?.toISOString() ?? null,
     contentVersion: tour.contentVersion,
     createdAt: tour.createdAt.toISOString(),
-    updatedAt: tour.updatedAt.toISOString()
+    updatedAt: tour.updatedAt.toISOString(),
   };
 }
 
-export async function listAdminPois(authContext: AdminRequestContext): Promise<PoiAdminListItem[]> {
+export async function listAdminPois(
+  authContext: AdminRequestContext,
+): Promise<PoiAdminListItem[]> {
   const where: Prisma.PointOfInterestWhereInput = { deletedAt: null };
-  if (authContext.role === 'PARTNER') {
+  if (authContext.role === "PARTNER") {
     where.creatorId = authContext.actorId;
   }
 
   const pois = await prisma.pointOfInterest.findMany({
     where,
-    orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
+    orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
     select: {
       id: true,
       name: true,
@@ -396,14 +444,17 @@ export async function listAdminPois(authContext: AdminRequestContext): Promise<P
       deletedAt: true,
       contentVersion: true,
       createdAt: true,
-      updatedAt: true
-    }
+      updatedAt: true,
+    },
   });
 
   return pois.map((poi) => toAdminPoiRecord(poi));
 }
 
-export async function getAdminPoiById(poiId: string, authContext: AdminRequestContext): Promise<PoiAdminListItem> {
+export async function getAdminPoiById(
+  poiId: string,
+  authContext: AdminRequestContext,
+): Promise<PoiAdminListItem> {
   const poi = await prisma.pointOfInterest.findFirst({
     where: { id: poiId, deletedAt: null },
     select: {
@@ -422,16 +473,16 @@ export async function getAdminPoiById(poiId: string, authContext: AdminRequestCo
       deletedAt: true,
       contentVersion: true,
       createdAt: true,
-      updatedAt: true
-    }
+      updatedAt: true,
+    },
   });
 
   if (!poi) {
-    throw new ApiError(404, 'Không tìm thấy POI.');
+    throw new ApiError(404, "Không tìm thấy POI.");
   }
 
-  if (authContext.role === 'PARTNER' && poi.creatorId !== authContext.actorId) {
-    throw new ApiError(403, 'Không có quyền truy cập POI này.');
+  if (authContext.role === "PARTNER" && poi.creatorId !== authContext.actorId) {
+    throw new ApiError(403, "Không có quyền truy cập POI này.");
   }
 
   return toAdminPoiRecord(poi);
@@ -440,22 +491,27 @@ export async function getAdminPoiById(poiId: string, authContext: AdminRequestCo
 export async function createAdminPoi(
   input: PoiAdminCreateInput,
   context?: AdminActionContext,
-  dbClient: DbClient = prisma
+  dbClient: DbClient = prisma,
 ): Promise<PoiAdminListItem> {
-  const name = normalizeTextMap(input.name, 'name');
-  const description = normalizeTextMap(input.description, 'description');
-  assertMatchingLanguageSets(name, description);
-  const latitude = normalizeNumericField(input.latitude, 'latitude');
-  const longitude = normalizeNumericField(input.longitude, 'longitude');
+  const inputName = normalizeTextMap(input.name, "name");
+  const inputDescription = normalizeTextMap(input.description, "description");
+  assertMatchingLanguageSets(inputName, inputDescription);
+  const name = await ensurePoiLocalizedTextMap(inputName);
+  const description = await ensurePoiLocalizedTextMap(inputDescription);
+  const latitude = normalizeNumericField(input.latitude, "latitude");
+  const longitude = normalizeNumericField(input.longitude, "longitude");
   const type = normalizePoiType(input.type);
-  const radius = input.radius !== undefined ? normalizeNumericField(input.radius, 'radius') : 50;
+  const radius =
+    input.radius !== undefined
+      ? normalizeNumericField(input.radius, "radius")
+      : 50;
   const creatorId = input.creatorId ?? null;
   const image = normalizeNullableString(input.image) ?? null;
   const audioUrls = normalizeAudioUrls(input.audioUrls);
   assertAudioUrlsAligned(audioUrls, description);
 
   if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-    throw new ApiError(400, 'latitude/longitude nằm ngoài phạm vi hợp lệ.');
+    throw new ApiError(400, "latitude/longitude nằm ngoài phạm vi hợp lệ.");
   }
 
   const poi = await dbClient.pointOfInterest.create({
@@ -470,7 +526,7 @@ export async function createAdminPoi(
       radius,
       creatorId,
       isPublished: true,
-      publishedAt: new Date()
+      publishedAt: new Date(),
     },
     select: {
       id: true,
@@ -488,36 +544,75 @@ export async function createAdminPoi(
       deletedAt: true,
       contentVersion: true,
       createdAt: true,
-      updatedAt: true
-    }
+      updatedAt: true,
+    },
   });
+
+  let resultPoi = poi;
+
+  if (Object.keys(audioUrls).length === 0) {
+    try {
+      const generatedAudioUrls = await generateMultiLanguageAudioForPoi(
+        description,
+        [...POI_TARGET_LANGUAGES],
+      );
+
+      resultPoi = await dbClient.pointOfInterest.update({
+        where: { id: poi.id },
+        data: { audioUrls: generatedAudioUrls },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          audioUrls: true,
+          latitude: true,
+          longitude: true,
+          type: true,
+          image: true,
+          radius: true,
+          creatorId: true,
+          isPublished: true,
+          publishedAt: true,
+          deletedAt: true,
+          contentVersion: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (error) {
+      console.error(
+        `[POI_AUDIO_GENERATION_FAILED] poi_id=${poi.id}:`,
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
 
   const action = normalizeActionContext(context);
   await recordAdminAuditEvent({
-    action: 'poi.create',
-    entity: 'poi',
+    action: "poi.create",
+    entity: "poi",
     entityId: poi.id,
     actor: action.actor,
     reason: action.reason,
     source: action.source,
     metadata: {
-      contentVersion: poi.contentVersion,
-      isPublished: poi.isPublished
-    }
+      contentVersion: resultPoi.contentVersion,
+      isPublished: resultPoi.isPublished,
+    },
   });
 
-  return toAdminPoiRecord(poi);
+  return toAdminPoiRecord(resultPoi);
 }
 
 export async function createAdminTour(
   input: TourAdminCreateInput & { creatorId?: string },
   context?: AdminActionContext,
-  dbClient: DbClient = prisma
+  dbClient: DbClient = prisma,
 ): Promise<TourAdminItem> {
-  const name = normalizeTextMap(input.name, 'name');
-  const description = normalizeTextMap(input.description, 'description');
+  const name = normalizeTextMap(input.name, "name");
+  const description = normalizeTextMap(input.description, "description");
   assertMatchingLanguageSets(name, description);
-  const poiIds = normalizePoiIds(input.poiIds, 'poiIds');
+  const poiIds = normalizePoiIds(input.poiIds, "poiIds");
   await assertExistingPoiIds(poiIds, dbClient);
   const duration = normalizeDuration(input.duration);
   const image = normalizeNullableString(input.image) ?? null;
@@ -533,7 +628,7 @@ export async function createAdminTour(
         image,
         creatorId,
         isPublished: true,
-        publishedAt: new Date()
+        publishedAt: new Date(),
       },
       select: {
         id: true,
@@ -547,8 +642,8 @@ export async function createAdminTour(
         deletedAt: true,
         contentVersion: true,
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
     await bumpSyncVersion(tx);
@@ -557,16 +652,16 @@ export async function createAdminTour(
 
   const action = normalizeActionContext(context);
   await recordAdminAuditEvent({
-    action: 'tour.create',
-    entity: 'tour',
+    action: "tour.create",
+    entity: "tour",
     entityId: tour.id,
     actor: action.actor,
     reason: action.reason,
     source: action.source,
     metadata: {
       contentVersion: tour.contentVersion,
-      isPublished: tour.isPublished
-    }
+      isPublished: tour.isPublished,
+    },
   });
 
   return toAdminTourRecord(tour);
@@ -577,7 +672,7 @@ export async function updateAdminPoi(
   input: PoiAdminUpdateInput,
   authContext: AdminRequestContext,
   context?: AdminActionContext,
-  dbClient: DbClient = prisma
+  dbClient: DbClient = prisma,
 ): Promise<PoiAdminListItem> {
   const existingPoi = await dbClient.pointOfInterest.findFirst({
     where: { id: poiId, deletedAt: null },
@@ -591,36 +686,64 @@ export async function updateAdminPoi(
       type: true,
       radius: true,
       creatorId: true,
-      image: true
-    }
+      image: true,
+    },
   });
 
   if (!existingPoi) {
-    throw new ApiError(404, 'Không tìm thấy POI.');
+    throw new ApiError(404, "Không tìm thấy POI.");
   }
 
-  if (authContext.role === 'PARTNER' && existingPoi.creatorId !== authContext.actorId) {
-    throw new ApiError(403, 'Không có quyền sửa POI này.');
+  if (
+    authContext.role === "PARTNER" &&
+    existingPoi.creatorId !== authContext.actorId
+  ) {
+    throw new ApiError(403, "Không có quyền sửa POI này.");
   }
 
-  const name = input.name !== undefined ? normalizeTextMap(input.name, 'name') : undefined;
-  const description = input.description !== undefined ? normalizeTextMap(input.description, 'description') : undefined;
-  const latitude = input.latitude !== undefined ? normalizeNumericField(input.latitude, 'latitude') : undefined;
-  const longitude = input.longitude !== undefined ? normalizeNumericField(input.longitude, 'longitude') : undefined;
-  const type = input.type !== undefined ? normalizePoiType(input.type) : undefined;
-  const radius = input.radius !== undefined ? normalizeNumericField(input.radius, 'radius') : undefined;
+  const name =
+    input.name !== undefined ? normalizeTextMap(input.name, "name") : undefined;
+  const description =
+    input.description !== undefined
+      ? normalizeTextMap(input.description, "description")
+      : undefined;
+  const latitude =
+    input.latitude !== undefined
+      ? normalizeNumericField(input.latitude, "latitude")
+      : undefined;
+  const longitude =
+    input.longitude !== undefined
+      ? normalizeNumericField(input.longitude, "longitude")
+      : undefined;
+  const type =
+    input.type !== undefined ? normalizePoiType(input.type) : undefined;
+  const radius =
+    input.radius !== undefined
+      ? normalizeNumericField(input.radius, "radius")
+      : undefined;
 
   // Prevent PARTNERs from transferring ownership to someone else
   let creatorId = input.creatorId !== undefined ? input.creatorId : undefined;
-  if (authContext.role === 'PARTNER' && creatorId !== undefined && creatorId !== existingPoi.creatorId) {
+  if (
+    authContext.role === "PARTNER" &&
+    creatorId !== undefined &&
+    creatorId !== existingPoi.creatorId
+  ) {
     creatorId = existingPoi.creatorId ?? undefined; // Ignore modifications
   }
 
-  const image = input.image !== undefined ? normalizeNullableString(input.image) : undefined;
-  const audioUrls = input.audioUrls !== undefined ? normalizeAudioUrls(input.audioUrls) : undefined;
+  const image =
+    input.image !== undefined
+      ? normalizeNullableString(input.image)
+      : undefined;
+  const audioUrls =
+    input.audioUrls !== undefined
+      ? normalizeAudioUrls(input.audioUrls)
+      : undefined;
 
-  const mergedName = name ?? normalizeTextMap(existingPoi.name, 'name');
-  const mergedDescription = description ?? normalizeTextMap(existingPoi.description, 'description');
+  const mergedName = name ?? normalizeTextMap(existingPoi.name, "name");
+  const mergedDescription =
+    description ?? normalizeTextMap(existingPoi.description, "description");
   assertMatchingLanguageSets(mergedName, mergedDescription);
 
   if (audioUrls !== undefined) {
@@ -628,11 +751,11 @@ export async function updateAdminPoi(
   }
 
   if (latitude !== undefined && (latitude < -90 || latitude > 90)) {
-    throw new ApiError(400, 'latitude nằm ngoài phạm vi hợp lệ.');
+    throw new ApiError(400, "latitude nằm ngoài phạm vi hợp lệ.");
   }
 
   if (longitude !== undefined && (longitude < -180 || longitude > 180)) {
-    throw new ApiError(400, 'longitude nằm ngoài phạm vi hợp lệ.');
+    throw new ApiError(400, "longitude nằm ngoài phạm vi hợp lệ.");
   }
 
   const updatedPoi = await dbClient.pointOfInterest.update({
@@ -648,8 +771,8 @@ export async function updateAdminPoi(
       creatorId,
       audioUrls,
       contentVersion: {
-        increment: 1
-      }
+        increment: 1,
+      },
     },
     select: {
       id: true,
@@ -667,22 +790,22 @@ export async function updateAdminPoi(
       deletedAt: true,
       contentVersion: true,
       createdAt: true,
-      updatedAt: true
-    }
+      updatedAt: true,
+    },
   });
 
   const action = normalizeActionContext(context);
   await recordAdminAuditEvent({
-    action: 'poi.update',
-    entity: 'poi',
+    action: "poi.update",
+    entity: "poi",
     entityId: poiId,
     actor: action.actor,
     reason: action.reason,
     source: action.source,
     metadata: {
       contentVersion: updatedPoi.contentVersion,
-      isPublished: updatedPoi.isPublished
-    }
+      isPublished: updatedPoi.isPublished,
+    },
   });
 
   // Auto-trigger TTS generation if description changed
@@ -690,7 +813,10 @@ export async function updateAdminPoi(
     try {
       await enqueuePoiTtsGeneration(poiId);
     } catch (error) {
-      console.error('[POI Update] Failed to enqueue TTS generation', { poiId, error });
+      console.error("[POI Update] Failed to enqueue TTS generation", {
+        poiId,
+        error,
+      });
       // Don't throw - TTS queueing failure should not block POI update
     }
   }
@@ -698,7 +824,10 @@ export async function updateAdminPoi(
   return toAdminPoiRecord(updatedPoi);
 }
 
-export async function getAdminTourById(tourId: string, authContext: AdminRequestContext): Promise<TourAdminItem> {
+export async function getAdminTourById(
+  tourId: string,
+  authContext: AdminRequestContext,
+): Promise<TourAdminItem> {
   const tour = await prisma.tour.findFirst({
     where: { id: tourId, deletedAt: null },
     select: {
@@ -714,16 +843,19 @@ export async function getAdminTourById(tourId: string, authContext: AdminRequest
       deletedAt: true,
       contentVersion: true,
       createdAt: true,
-      updatedAt: true
-    }
+      updatedAt: true,
+    },
   });
 
   if (!tour) {
-    throw new ApiError(404, 'Không tìm thấy Tour.');
+    throw new ApiError(404, "Không tìm thấy Tour.");
   }
 
-  if (authContext.role === 'PARTNER' && tour.creatorId !== authContext.actorId) {
-    throw new ApiError(403, 'Không có quyền truy cập Tour này.');
+  if (
+    authContext.role === "PARTNER" &&
+    tour.creatorId !== authContext.actorId
+  ) {
+    throw new ApiError(403, "Không có quyền truy cập Tour này.");
   }
 
   return toAdminTourRecord(tour);
@@ -734,7 +866,7 @@ export async function updateAdminTour(
   input: TourAdminUpdateInput,
   authContext: AdminRequestContext,
   context?: AdminActionContext,
-  dbClient: DbClient = prisma
+  dbClient: DbClient = prisma,
 ): Promise<TourAdminItem> {
   const existingTour = await dbClient.tour.findFirst({
     where: { id: tourId, deletedAt: null },
@@ -745,26 +877,43 @@ export async function updateAdminTour(
       duration: true,
       poiIds: true,
       creatorId: true,
-      image: true
-    }
+      image: true,
+    },
   });
 
   if (!existingTour) {
-    throw new ApiError(404, 'Không tìm thấy Tour.');
+    throw new ApiError(404, "Không tìm thấy Tour.");
   }
 
-  if (authContext.role === 'PARTNER' && existingTour.creatorId !== authContext.actorId) {
-    throw new ApiError(403, 'Không có quyền sửa Tour này.');
+  if (
+    authContext.role === "PARTNER" &&
+    existingTour.creatorId !== authContext.actorId
+  ) {
+    throw new ApiError(403, "Không có quyền sửa Tour này.");
   }
 
-  const name = input.name !== undefined ? normalizeTextMap(input.name, 'name') : undefined;
-  const description = input.description !== undefined ? normalizeTextMap(input.description, 'description') : undefined;
-  const poiIds = input.poiIds !== undefined ? normalizePoiIds(input.poiIds, 'poiIds') : undefined;
-  const duration = input.duration !== undefined ? normalizeDuration(input.duration) : undefined;
-  const image = input.image !== undefined ? normalizeNullableString(input.image) : undefined;
+  const name =
+    input.name !== undefined ? normalizeTextMap(input.name, "name") : undefined;
+  const description =
+    input.description !== undefined
+      ? normalizeTextMap(input.description, "description")
+      : undefined;
+  const poiIds =
+    input.poiIds !== undefined
+      ? normalizePoiIds(input.poiIds, "poiIds")
+      : undefined;
+  const duration =
+    input.duration !== undefined
+      ? normalizeDuration(input.duration)
+      : undefined;
+  const image =
+    input.image !== undefined
+      ? normalizeNullableString(input.image)
+      : undefined;
 
-  const mergedName = name ?? normalizeTextMap(existingTour.name, 'name');
-  const mergedDescription = description ?? normalizeTextMap(existingTour.description, 'description');
+  const mergedName = name ?? normalizeTextMap(existingTour.name, "name");
+  const mergedDescription =
+    description ?? normalizeTextMap(existingTour.description, "description");
   assertMatchingLanguageSets(mergedName, mergedDescription);
 
   if (poiIds !== undefined) {
@@ -778,13 +927,16 @@ export async function updateAdminTour(
         name,
         description,
         duration,
-        poiIds: poiIds !== undefined ? (poiIds as unknown as Prisma.InputJsonValue) : undefined,
+        poiIds:
+          poiIds !== undefined
+            ? (poiIds as unknown as Prisma.InputJsonValue)
+            : undefined,
         image,
         isPublished: true,
         publishedAt: new Date(),
         contentVersion: {
-          increment: 1
-        }
+          increment: 1,
+        },
       },
       select: {
         id: true,
@@ -798,8 +950,8 @@ export async function updateAdminTour(
         deletedAt: true,
         contentVersion: true,
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
     await bumpSyncVersion(tx);
@@ -808,16 +960,16 @@ export async function updateAdminTour(
 
   const action = normalizeActionContext(context);
   await recordAdminAuditEvent({
-    action: 'tour.update',
-    entity: 'tour',
+    action: "tour.update",
+    entity: "tour",
     entityId: tour.id,
     actor: action.actor,
     reason: action.reason,
     source: action.source,
     metadata: {
       contentVersion: tour.contentVersion,
-      isPublished: tour.isPublished
-    }
+      isPublished: tour.isPublished,
+    },
   });
 
   return toAdminTourRecord(tour);
@@ -826,18 +978,18 @@ export async function updateAdminTour(
 async function bumpSyncVersion(dbClient: DbClient): Promise<number> {
   const existingSetting = await dbClient.appSetting.findUnique({
     where: { id: 1 },
-    select: { currentVersion: true }
+    select: { currentVersion: true },
   });
 
   if (!existingSetting) {
     const created = await dbClient.appSetting.create({
       data: {
         id: 1,
-        currentVersion: 2
+        currentVersion: 2,
       },
       select: {
-        currentVersion: true
-      }
+        currentVersion: true,
+      },
     });
 
     return created.currentVersion;
@@ -847,12 +999,12 @@ async function bumpSyncVersion(dbClient: DbClient): Promise<number> {
     where: { id: 1 },
     data: {
       currentVersion: {
-        increment: 1
-      }
+        increment: 1,
+      },
     },
     select: {
-      currentVersion: true
-    }
+      currentVersion: true,
+    },
   });
 
   return updated.currentVersion;
@@ -861,15 +1013,15 @@ async function bumpSyncVersion(dbClient: DbClient): Promise<number> {
 export async function publishAdminPoi(
   poiId: string,
   context?: AdminActionContext,
-  dbClient: DbClient = prisma
+  dbClient: DbClient = prisma,
 ): Promise<PublishAdminPoiResult> {
   const existingPoi = await dbClient.pointOfInterest.findFirst({
     where: { id: poiId, deletedAt: null },
-    select: { id: true }
+    select: { id: true },
   });
 
   if (!existingPoi) {
-    throw new ApiError(404, 'Không tìm thấy POI.');
+    throw new ApiError(404, "Không tìm thấy POI.");
   }
 
   const result = await withOptionalTransaction(dbClient, async (tx) => {
@@ -877,7 +1029,7 @@ export async function publishAdminPoi(
       where: { id: poiId },
       data: {
         isPublished: true,
-        publishedAt: new Date()
+        publishedAt: new Date(),
       },
       select: {
         id: true,
@@ -895,41 +1047,45 @@ export async function publishAdminPoi(
         deletedAt: true,
         contentVersion: true,
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
     const syncVersion = await bumpSyncVersion(tx);
 
     return {
       ...toAdminPoiRecord(updatedPoi),
-      syncVersion
+      syncVersion,
     };
   });
 
   const action = normalizeActionContext(context);
   await recordAdminAuditEvent({
-    action: 'poi.publish',
-    entity: 'poi',
+    action: "poi.publish",
+    entity: "poi",
     entityId: poiId,
     actor: action.actor,
     reason: action.reason,
     source: action.source,
     metadata: {
       syncVersion: result.syncVersion,
-      contentVersion: result.contentVersion
-    }
+      contentVersion: result.contentVersion,
+    },
   });
 
   return result;
 }
 
-export async function invalidateSyncManifest(dbClient: DbClient = prisma): Promise<InvalidateSyncResult> {
-  const syncVersion = await withOptionalTransaction(dbClient, async (tx) => bumpSyncVersion(tx));
+export async function invalidateSyncManifest(
+  dbClient: DbClient = prisma,
+): Promise<InvalidateSyncResult> {
+  const syncVersion = await withOptionalTransaction(dbClient, async (tx) =>
+    bumpSyncVersion(tx),
+  );
 
   return {
     invalidated: true,
-    syncVersion
+    syncVersion,
   };
 }
 
@@ -937,30 +1093,37 @@ export async function deleteAdminPoi(
   poiId: string,
   authContext: AdminRequestContext,
   context?: AdminActionContext,
-  dbClient: DbClient = prisma
+  dbClient: DbClient = prisma,
 ): Promise<PoiAdminListItem> {
   const existingPoi = await dbClient.pointOfInterest.findFirst({
     where: { id: poiId, deletedAt: null },
-    select: { id: true, creatorId: true }
+    select: { id: true, creatorId: true },
   });
 
   if (!existingPoi) {
-    throw new ApiError(404, 'Không tìm thấy POI.');
+    throw new ApiError(404, "Không tìm thấy POI.");
   }
 
-  if (authContext.role === 'PARTNER' && existingPoi.creatorId !== authContext.actorId) {
-    throw new ApiError(403, 'Không có quyền xóa POI này.');
+  if (
+    authContext.role === "PARTNER" &&
+    existingPoi.creatorId !== authContext.actorId
+  ) {
+    throw new ApiError(403, "Không có quyền xóa POI này.");
   }
 
   const relatedTours = await dbClient.tour.findMany({
     where: { deletedAt: null },
     select: {
       id: true,
-      poiIds: true
-    }
+      poiIds: true,
+    },
   });
 
-  const toursToUpdate = relatedTours.filter((tour) => Array.isArray(tour.poiIds) && tour.poiIds.some((value) => value === poiId));
+  const toursToUpdate = relatedTours.filter(
+    (tour) =>
+      Array.isArray(tour.poiIds) &&
+      tour.poiIds.some((value) => value === poiId),
+  );
 
   const deletedPoi = await withOptionalTransaction(dbClient, async (tx) => {
     const updatedPoi = await tx.pointOfInterest.update({
@@ -970,8 +1133,8 @@ export async function deleteAdminPoi(
         isPublished: false,
         publishedAt: null,
         contentVersion: {
-          increment: 1
-        }
+          increment: 1,
+        },
       },
       select: {
         id: true,
@@ -989,20 +1152,22 @@ export async function deleteAdminPoi(
         deletedAt: true,
         contentVersion: true,
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
     for (const tour of toursToUpdate) {
-      const nextPoiIds = (tour.poiIds as unknown[]).filter((value) => value !== poiId);
+      const nextPoiIds = (tour.poiIds as unknown[]).filter(
+        (value) => value !== poiId,
+      );
       await tx.tour.update({
         where: { id: tour.id },
         data: {
           poiIds: nextPoiIds as unknown as Prisma.InputJsonValue,
           contentVersion: {
-            increment: 1
-          }
-        }
+            increment: 1,
+          },
+        },
       });
     }
 
@@ -1012,20 +1177,23 @@ export async function deleteAdminPoi(
   });
 
   void cleanupPoiAudioFiles(poiId).catch((error) => {
-    console.warn('[POI] Failed to cleanup audio files for deleted POI', { poiId, error });
+    console.warn("[POI] Failed to cleanup audio files for deleted POI", {
+      poiId,
+      error,
+    });
   });
 
   const action = normalizeActionContext(context);
   await recordAdminAuditEvent({
-    action: 'poi.soft_delete',
-    entity: 'poi',
+    action: "poi.soft_delete",
+    entity: "poi",
     entityId: poiId,
     actor: action.actor,
     reason: action.reason,
     source: action.source,
     metadata: {
-      contentVersion: deletedPoi.contentVersion
-    }
+      contentVersion: deletedPoi.contentVersion,
+    },
   });
 
   return toAdminPoiRecord(deletedPoi);
@@ -1035,19 +1203,22 @@ export async function deleteAdminTour(
   tourId: string,
   authContext: AdminRequestContext,
   context?: AdminActionContext,
-  dbClient: DbClient = prisma
+  dbClient: DbClient = prisma,
 ): Promise<TourAdminItem> {
   const existingTour = await dbClient.tour.findFirst({
     where: { id: tourId, deletedAt: null },
-    select: { id: true, creatorId: true }
+    select: { id: true, creatorId: true },
   });
 
   if (!existingTour) {
-    throw new ApiError(404, 'Không tìm thấy Tour.');
+    throw new ApiError(404, "Không tìm thấy Tour.");
   }
 
-  if (authContext.role === 'PARTNER' && existingTour.creatorId !== authContext.actorId) {
-    throw new ApiError(403, 'Không có quyền xóa Tour này.');
+  if (
+    authContext.role === "PARTNER" &&
+    existingTour.creatorId !== authContext.actorId
+  ) {
+    throw new ApiError(403, "Không có quyền xóa Tour này.");
   }
 
   const deletedTour = await withOptionalTransaction(dbClient, async (tx) => {
@@ -1058,8 +1229,8 @@ export async function deleteAdminTour(
         isPublished: false,
         publishedAt: null,
         contentVersion: {
-          increment: 1
-        }
+          increment: 1,
+        },
       },
       select: {
         id: true,
@@ -1073,8 +1244,8 @@ export async function deleteAdminTour(
         deletedAt: true,
         contentVersion: true,
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
     await bumpSyncVersion(tx);
@@ -1083,15 +1254,15 @@ export async function deleteAdminTour(
 
   const action = normalizeActionContext(context);
   await recordAdminAuditEvent({
-    action: 'tour.soft_delete',
-    entity: 'tour',
+    action: "tour.soft_delete",
+    entity: "tour",
     entityId: deletedTour.id,
     actor: action.actor,
     reason: action.reason,
     source: action.source,
     metadata: {
-      contentVersion: deletedTour.contentVersion
-    }
+      contentVersion: deletedTour.contentVersion,
+    },
   });
 
   return toAdminTourRecord(deletedTour);
@@ -1105,21 +1276,23 @@ export async function purgeSoftDeletedPois(options?: {
   const dryRun = options?.dryRun === true;
   const now = options?.now ?? new Date();
   const retentionDays = getSoftDeleteRetentionDays();
-  const cutoffAt = new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000);
+  const cutoffAt = new Date(
+    now.getTime() - retentionDays * 24 * 60 * 60 * 1000,
+  );
 
   const softDeletedPois = await prisma.pointOfInterest.findMany({
     where: {
       deletedAt: {
-        lte: cutoffAt
-      }
+        lte: cutoffAt,
+      },
     },
     select: {
       id: true,
-      image: true
+      image: true,
     },
     orderBy: {
-      deletedAt: 'asc'
-    }
+      deletedAt: "asc",
+    },
   });
 
   if (dryRun || softDeletedPois.length === 0) {
@@ -1132,7 +1305,7 @@ export async function purgeSoftDeletedPois(options?: {
       deletedIds: [],
       audioFilesRemoved: 0,
       imagesRemoved: 0,
-      imageCleanupFailed: 0
+      imageCleanupFailed: 0,
     };
   }
 
@@ -1153,10 +1326,13 @@ export async function purgeSoftDeletedPois(options?: {
         }
       } catch (error) {
         imageCleanupFailed += 1;
-        console.warn('[POI] Failed to cleanup cloud image during retention purge', {
-          poiId: poi.id,
-          error
-        });
+        console.warn(
+          "[POI] Failed to cleanup cloud image during retention purge",
+          {
+            poiId: poi.id,
+            error,
+          },
+        );
       }
     }
   }
@@ -1164,15 +1340,15 @@ export async function purgeSoftDeletedPois(options?: {
   await prisma.pointOfInterest.deleteMany({
     where: {
       id: {
-        in: deletedIds
-      }
-    }
+        in: deletedIds,
+      },
+    },
   });
 
   const action = normalizeActionContext(options?.context);
   await recordAdminAuditEvent({
-    action: 'poi.retention_purge',
-    entity: 'system',
+    action: "poi.retention_purge",
+    entity: "system",
     actor: action.actor,
     reason: action.reason,
     source: action.source,
@@ -1183,8 +1359,8 @@ export async function purgeSoftDeletedPois(options?: {
       deletedIds,
       audioFilesRemoved,
       imagesRemoved,
-      imageCleanupFailed
-    }
+      imageCleanupFailed,
+    },
   });
 
   return {
@@ -1196,12 +1372,12 @@ export async function purgeSoftDeletedPois(options?: {
     deletedIds,
     audioFilesRemoved,
     imagesRemoved,
-    imageCleanupFailed
+    imageCleanupFailed,
   };
 }
 
 export function initializePoiSoftDeleteCleanupScheduler(): NodeJS.Timeout | null {
-  const enabled = process.env.POI_SOFT_DELETE_CLEANUP_ENABLED === 'true';
+  const enabled = process.env.POI_SOFT_DELETE_CLEANUP_ENABLED === "true";
   if (!enabled) {
     return null;
   }
@@ -1215,12 +1391,12 @@ export function initializePoiSoftDeleteCleanupScheduler(): NodeJS.Timeout | null
     void purgeSoftDeletedPois({
       dryRun: false,
       context: {
-        actor: 'system',
-        reason: 'scheduled retention cleanup',
-        source: 'scheduler'
-      }
+        actor: "system",
+        reason: "scheduled retention cleanup",
+        source: "scheduler",
+      },
     }).catch((error) => {
-      console.error('[POI] Soft delete cleanup scheduler failed', error);
+      console.error("[POI] Soft delete cleanup scheduler failed", error);
     });
   }, intervalMs);
 

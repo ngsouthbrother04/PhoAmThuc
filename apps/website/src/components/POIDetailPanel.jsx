@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Globe,
   Landmark,
@@ -10,13 +10,16 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { useLanguage, pickLocalizedText, useTranslation } from "../hooks/useLanguageContext";
+import {
+  useLanguage,
+  pickLocalizedText,
+  useTranslation,
+} from "../hooks/useLanguageContext";
 
 export default function POIDetailPanel({ poi, onClose, autoPlayTrigger = 0 }) {
   const { language } = useLanguage();
   const t = useTranslation();
   const audioRef = useRef(null);
-  const speechRef = useRef(null);
   const progressRafRef = useRef(null);
   const playbackRateRef = useRef(1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -24,47 +27,9 @@ export default function POIDetailPanel({ poi, onClose, autoPlayTrigger = 0 }) {
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolume] = useState(1);
-  const [isMarked, setIsMarked] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const poiName = pickLocalizedText(poi.name, language, "Untitled POI");
   const poiDescription = pickLocalizedText(poi.description, language, "");
-  const descriptionText = poiDescription;
-  const descriptionLanguage = (navigator.language || "vi-VN").startsWith("vi")
-    ? "vi-VN"
-    : "en-US";
-
-  const stopDescription = useCallback(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-
-    window.speechSynthesis.cancel();
-    speechRef.current = null;
-    setIsSpeaking(false);
-  }, []);
-
-  const speakDescription = useCallback(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    if (!descriptionText.trim()) return;
-
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(descriptionText);
-    utterance.lang = descriptionLanguage;
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    utterance.onend = () => {
-      speechRef.current = null;
-      setIsSpeaking(false);
-    };
-    utterance.onerror = () => {
-      speechRef.current = null;
-      setIsSpeaking(false);
-    };
-
-    speechRef.current = utterance;
-    setIsSpeaking(true);
-    window.speechSynthesis.speak(utterance);
-  }, [descriptionLanguage, descriptionText]);
 
   const handlePlayPause = () => {
     if (!audioRef.current) return;
@@ -179,12 +144,6 @@ export default function POIDetailPanel({ poi, onClose, autoPlayTrigger = 0 }) {
   }, [isPlaying]);
 
   useEffect(() => {
-    return () => {
-      stopDescription();
-    };
-  }, [stopDescription]);
-
-  useEffect(() => {
     if (!audioRef.current) return;
     audioRef.current.volume = volume;
   }, [volume]);
@@ -193,7 +152,6 @@ export default function POIDetailPanel({ poi, onClose, autoPlayTrigger = 0 }) {
     if (audioRef.current) {
       audioRef.current.pause();
     }
-    stopDescription();
     onClose();
   };
 
@@ -234,23 +192,9 @@ export default function POIDetailPanel({ poi, onClose, autoPlayTrigger = 0 }) {
 
         {/* Description */}
         <div className="mb-6 rounded-2xl bg-orange-50/70 border border-orange-100 p-4">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-600">
-              {t.poi.descriptionVoice}
-            </p>
-            <button
-              type="button"
-              onClick={isSpeaking ? stopDescription : speakDescription}
-              className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                isSpeaking
-                  ? "bg-slate-900 text-white"
-                  : "bg-orange-500 text-white hover:bg-orange-600"
-              }`}
-            >
-              <Volume2 size={14} />
-              {isSpeaking ? t.poi.stopVoice : t.poi.readDescription}
-            </button>
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-600 mb-3">
+            {t.poi.descriptionVoice}
+          </p>
           <p className="text-gray-700 text-base leading-relaxed">
             {poiDescription}
           </p>
@@ -387,18 +331,6 @@ export default function POIDetailPanel({ poi, onClose, autoPlayTrigger = 0 }) {
             </span>
           </div>
         </div>
-
-        {/* Stop & Mark Button */}
-        <button
-          onClick={() => setIsMarked(!isMarked)}
-          className={`w-full py-3 rounded-lg font-medium transition ${
-            isMarked
-              ? "bg-orange-500 text-white"
-              : "bg-gray-900 text-white hover:bg-gray-800"
-          }`}
-        >
-          {isMarked ? t.poi.marked : t.poi.stopAndMark}
-        </button>
 
         {/* Vietnamese Translation */}
         <div className="mt-8 pt-6 border-t border-gray-200">

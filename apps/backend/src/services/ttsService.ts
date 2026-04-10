@@ -1,9 +1,10 @@
-import fs from "fs/promises";
+﻿import fs from "fs/promises";
 import os from "os";
 import path from "path";
 import { spawn } from "node:child_process";
 import { Queue, Worker, type JobsOptions } from "bullmq";
 import prisma from "../lib/prisma";
+import { synthesizeWithGoogleCloud } from "./googleTtsClient";
 
 const TTS_QUEUE_NAME = "tts-generation";
 const DEFAULT_TTS_LANGUAGES = [
@@ -56,6 +57,7 @@ export interface TtsRuntimeConfigValidation {
 
 type QueueMode = "bullmq" | "in-memory";
 type StorageProvider = "local";
+type TtsProvider = "piper" | "google";
 
 let ttsQueue: Queue | null = null;
 let ttsWorker: Worker<TtsJobPayload> | null = null;
@@ -67,6 +69,15 @@ function getQueueMode(): QueueMode {
 
 function getStorageProvider(): StorageProvider {
   return "local";
+}
+
+function getTtsProvider(): TtsProvider {
+  const provider = (process.env.TTS_PROVIDER ?? "piper").trim().toLowerCase();
+  if (provider === "google") {
+    return "google";
+  }
+
+  return "piper";
 }
 
 function getPiperBinary(): string {
@@ -129,6 +140,7 @@ function resolvePiperModelPath(language: string): string {
 export function validateTtsRuntimeConfig(): TtsRuntimeConfigValidation {
   const queueMode = getQueueMode();
   const storageProvider = getStorageProvider();
+  const provider = getTtsProvider();
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -157,21 +169,48 @@ export function validateTtsRuntimeConfig(): TtsRuntimeConfigValidation {
     );
   }
 
-  const piperModelDir = process.env.PIPER_MODEL_DIR?.trim();
-  const piperModelMap = process.env.PIPER_MODEL_MAP?.trim();
-  if (!piperModelDir && !piperModelMap) {
-    warnings.push(
-      "PIPER_MODEL_DIR or PIPER_MODEL_MAP is not set. TTS generation may fail at runtime.",
-    );
+  if (provider === "piper") {
+    const piperModelDir = process.env.PIPER_MODEL_DIR?.trim();
+    const piperModelMap = process.env.PIPER_MODEL_MAP?.trim();
+    if (!piperModelDir && !piperModelMap) {
+      warnings.push(
+        "PIPER_MODEL_DIR or PIPER_MODEL_MAP is not set. TTS generation may fail at runtime.",
+      );
+    }
+
+    if (piperModelMap) {
+      try {
+        parsePiperModelMap();
+      } catch {
+        errors.push(
+          'PIPER_MODEL_MAP must be valid JSON object (e.g. {"vi":"./models/vi.onnx"}).',
+        );
+      }
+    }
   }
 
-  if (piperModelMap) {
-    try {
-      parsePiperModelMap();
-    } catch {
+  if (provider === "google") {
+    const credentialsJson = process.env.GOOGLE_TTS_CREDENTIALS_JSON?.trim();
+    const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
+
+    if (!credentialsJson && !credentialsPath) {
       errors.push(
-        'PIPER_MODEL_MAP must be valid JSON object (e.g. {"vi":"./models/vi.onnx"}).',
+        "Google TTS requires GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_TTS_CREDENTIALS_JSON.",
       );
+    }
+
+    const voiceMap = process.env.GOOGLE_TTS_VOICE_MAP?.trim();
+    if (voiceMap) {
+      try {
+        const parsed = JSON.parse(voiceMap) as unknown;
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          throw new Error("GOOGLE_TTS_VOICE_MAP_INVALID_JSON");
+        }
+      } catch {
+        errors.push(
+          'GOOGLE_TTS_VOICE_MAP must be valid JSON object (e.g. {"en":"en-US-Standard-C"}).',
+        );
+      }
     }
   }
 
@@ -216,6 +255,109 @@ function normalizePreviewLanguage(language: string): string {
   }
 
   throw new Error("TTS_LANGUAGE_NOT_SUPPORTED");
+}
+
+function detectLanguageFromText(text: string): string {
+  const configured = new Set(getConfiguredLanguages());
+  const normalized = text.trim();
+  const lower = normalized.toLowerCase();
+
+  const fallback = configured.has("vi") ? "vi" : [...configured][0] || "vi";
+
+  if (/[^\x00-\x7F]/.test(normalized) && configured.has("zh")) {
+    // Script-based detection below handles non-Latin text first.
+  }
+
+  if (/[\u3040-\u30ff\u31f0-\u31ff]/.test(normalized) && configured.has("ja")) {
+    return "ja";
+  }
+
+  if (
+    /[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/.test(normalized) &&
+    configured.has("ko")
+  ) {
+    return "ko";
+  }
+
+  if (/[\u4e00-\u9fff]/.test(normalized) && configured.has("zh")) {
+    return "zh";
+  }
+
+  if (/[\u0400-\u04ff]/.test(normalized) && configured.has("ru")) {
+    return "ru";
+  }
+
+  if (
+    /[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]/.test(normalized) &&
+    configured.has("ar")
+  ) {
+    return "ar";
+  }
+
+  if (/[\u0900-\u097f]/.test(normalized) && configured.has("hi")) {
+    return "hi";
+  }
+
+  if (
+    /[ăâđêôơưĂÂĐÊÔƠƯáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]/.test(
+      normalized,
+    ) &&
+    configured.has("vi")
+  ) {
+    return "vi";
+  }
+
+  if (/[ğıüşöçİĞÜŞÖÇ]/.test(normalized) && configured.has("tr")) {
+    return "tr";
+  }
+
+  const tokens = (lower.match(/[a-zA-Z\u00c0-\u024f]+/g) || []).map((token) =>
+    token.toLowerCase(),
+  );
+
+  const keywordMap: Record<string, string[]> = {
+    vi: ["khong", "toi", "ban", "mon", "quan", "pho", "thuc"],
+    en: ["the", "and", "is", "are", "with", "for", "this"],
+    fr: ["bonjour", "avec", "pour", "une", "les", "des", "est"],
+    de: ["und", "ist", "mit", "der", "die", "das", "nicht"],
+    es: ["hola", "con", "para", "una", "que", "los", "las"],
+    pt: ["ola", "com", "para", "uma", "que", "dos", "das"],
+    id: ["dan", "yang", "untuk", "dengan", "ini", "itu", "saya"],
+    tr: ["ve", "bir", "icin", "ile", "bu", "su", "degil"],
+  };
+
+  let bestLanguage = fallback;
+  let bestScore = 0;
+
+  for (const [language, keywords] of Object.entries(keywordMap)) {
+    if (!configured.has(language)) {
+      continue;
+    }
+
+    const score = tokens.reduce(
+      (sum, token) => (keywords.includes(token) ? sum + 1 : sum),
+      0,
+    );
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestLanguage = language;
+    }
+  }
+
+  return bestLanguage;
+}
+
+function resolvePreviewLanguageFromInput(
+  text: string,
+  requestedLanguage?: string,
+): string {
+  const requested = requestedLanguage?.trim().toLowerCase() || "";
+  if (!requested || requested === "auto") {
+    return detectLanguageFromText(text);
+  }
+
+  return normalizePreviewLanguage(requested);
 }
 
 function normalizeLocalizedTextMap(value: unknown): Record<string, string> {
@@ -426,9 +568,18 @@ async function synthesizeWithPiper(
   }
 }
 
+async function synthesizeText(text: string, language: string): Promise<Buffer> {
+  const provider = getTtsProvider();
+  if (provider === "google") {
+    return synthesizeWithGoogleCloud(text, language);
+  }
+
+  return synthesizeWithPiper(text, language);
+}
+
 export async function synthesizePreviewAudioFromText(
   text: string,
-  language = "vi",
+  language = "auto",
 ): Promise<{
   language: string;
   audioBuffer: Buffer;
@@ -442,11 +593,11 @@ export async function synthesizePreviewAudioFromText(
     throw new Error("TTS_TEXT_TOO_LONG");
   }
 
-  const normalizedLanguage = normalizePreviewLanguage(language);
-  const audioBuffer = await synthesizeWithPiper(
+  const normalizedLanguage = resolvePreviewLanguageFromInput(
     normalizedText,
-    normalizedLanguage,
+    language,
   );
+  const audioBuffer = await synthesizeText(normalizedText, normalizedLanguage);
 
   return {
     language: normalizedLanguage,
@@ -469,7 +620,7 @@ async function processTtsJob(
     throw new Error("POI_NOT_FOUND");
   }
 
-  const audioBuffer = await synthesizeWithPiper(payload.text, payload.language);
+  const audioBuffer = await synthesizeText(payload.text, payload.language);
   const fileName = `${payload.poiId}_${payload.language}_v${payload.contentVersion}.wav`;
   const audioUrl = await saveAudioFile(fileName, audioBuffer);
   await cleanupOlderPoiAudioVersions(payload.poiId, payload.language, fileName);

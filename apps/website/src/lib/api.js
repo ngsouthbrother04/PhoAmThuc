@@ -85,6 +85,104 @@ export const authAPI = {
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
       }),
+
+  redeemClaimCode: (claimCode) =>
+    authFetch(`${API_BASE_URL}/api/v1/auth/payment/claim`, {
+      method: "POST",
+      body: JSON.stringify({ code: claimCode }),
+    }).then(async (r) => {
+      const data = await r.json();
+      if (!r.ok) {
+        throw new Error(data?.message || "Không thể dùng mã đăng ký đối tác.");
+      }
+      return data;
+    }),
+};
+
+// Partner
+export const partnerAPI = {
+  submitPartnerRegistrationRequest: ({ shopName, shopAddress, note }) =>
+    authFetch(`${API_BASE_URL}/api/v1/users/me/partner-registration-requests`, {
+      method: "POST",
+      body: JSON.stringify({ shopName, shopAddress, note }),
+    }).then(async (r) => {
+      const data = await r.json();
+      if (!r.ok) {
+        throw new Error(data?.message || "Không thể gửi yêu cầu đăng ký đối tác.");
+      }
+      return data?.data;
+    }),
+
+  listMyPartnerRegistrationRequests: () =>
+    authFetch(`${API_BASE_URL}/api/v1/users/me/partner-registration-requests`).then(
+      async (r) => {
+        const data = await r.json();
+        if (!r.ok) {
+          throw new Error(
+            data?.message || "Không thể tải trạng thái yêu cầu đăng ký đối tác.",
+          );
+        }
+        return data?.data?.items ?? [];
+      },
+    ),
+
+  getLatestPartnerRegistrationRequest: () =>
+    authFetch(
+      `${API_BASE_URL}/api/v1/users/me/partner-registration-requests/latest`,
+    ).then(async (r) => {
+      const data = await r.json();
+      if (!r.ok) {
+        throw new Error(
+          data?.message || "Không thể tải yêu cầu đăng ký đối tác gần nhất.",
+        );
+      }
+      return data?.data ?? null;
+    }),
+
+  getMyPois: () =>
+    authFetch(`${API_BASE_URL}/api/v1/admin/pois`).then(async (r) => {
+      const data = await r.json();
+      if (!r.ok) {
+        throw new Error(data?.message || "Không thể tải danh sách POI đối tác.");
+      }
+      return data?.items ?? [];
+    }),
+
+  createPoiRequest: (payload) =>
+    authFetch(`${API_BASE_URL}/api/v1/partner/pois`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }).then(async (r) => {
+      const data = await r.json();
+      if (!r.ok) {
+        throw new Error(data?.message || "Không thể gửi yêu cầu tạo POI.");
+      }
+      return data;
+    }),
+
+  uploadPoiImage: (poiId, imageFile) => {
+    const token = getAccessToken();
+    const formData = new FormData();
+    formData.append("image", imageFile);
+
+    return fetch(`${API_BASE_URL}/api/v1/partner/pois/${poiId}/image/upload`, {
+      method: "POST",
+      headers: token
+        ? {
+            Authorization: `Bearer ${token}`,
+          }
+        : {},
+      body: formData,
+    }).then(async (r) => {
+      const data = await r.json();
+      if (!r.ok) {
+        throw new Error(data?.message || "Không thể upload ảnh POI.");
+      }
+      return data;
+    });
+  },
+
+  listMyApprovalRequests: async () => [],
 };
 
 // POIs
@@ -210,7 +308,7 @@ export const analyticsAPI = {
 
 // TTS
 export const ttsAPI = {
-  previewFromText: async (text, language = "vi") => {
+  previewFromText: async (text, language = "auto") => {
     const response = await authFetch(
       `${API_BASE_URL}/api/v1/auth/tts-preview`,
       {

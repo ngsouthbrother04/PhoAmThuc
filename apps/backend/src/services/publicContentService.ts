@@ -171,7 +171,9 @@ export async function getPoisByBounds(
     select: {
       id: true,
       name: true,
+      description: true,
       type: true,
+      radius: true,
       latitude: true,
       longitude: true,
       image: true,

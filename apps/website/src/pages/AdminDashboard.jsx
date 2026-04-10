@@ -24,10 +24,6 @@ import {
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:3000";
-const ADMIN_API_KEY =
-  import.meta.env.VITE_ADMIN_API_KEY?.trim() ||
-  import.meta.env.VITE_BACKEND_ADMIN_API_KEY?.trim() ||
-  "";
 
 const statCards = [
   {
@@ -117,6 +113,30 @@ const shortcuts = [
   },
 ];
 
+function getPartnerRegistrationTone(status) {
+  if (status === "APPROVED") {
+    return "emerald";
+  }
+
+  if (status === "REJECTED") {
+    return "rose";
+  }
+
+  return "amber";
+}
+
+function getPartnerRegistrationLabel(status) {
+  if (status === "APPROVED") {
+    return "Approved";
+  }
+
+  if (status === "REJECTED") {
+    return "Rejected";
+  }
+
+  return "Pending";
+}
+
 function DashboardMetric({ title, value, delta, icon, gradient }) {
   const MetricIcon = icon;
 
@@ -196,7 +216,11 @@ function getStoredToken() {
     return "";
   }
 
-  return window.localStorage.getItem("token")?.trim() || "";
+  return (
+    window.localStorage.getItem("accessToken")?.trim() ||
+    window.localStorage.getItem("token")?.trim() ||
+    ""
+  );
 }
 
 function pickLocalizedText(value) {
@@ -295,6 +319,8 @@ function getPoiStatusLabel(poi) {
 
 export default function AdminDashboard() {
   const [adminPois, setAdminPois] = useState([]);
+  const [partnerRegistrationRequests, setPartnerRegistrationRequests] =
+    useState([]);
   const [ttsQueueStatus, setTtsQueueStatus] = useState(null);
   const [ttsValidation, setTtsValidation] = useState(null);
   const [syncManifest, setSyncManifest] = useState(null);
@@ -312,23 +338,24 @@ export default function AdminDashboard() {
       setIsLoading(true);
       setLoadError("");
 
-      if (!ADMIN_API_KEY) {
+      if (!storedToken) {
         if (!cancelled) {
           setLoadError(
-            "Thiếu VITE_ADMIN_API_KEY nên chưa thể tải dữ liệu admin thật.",
+            "Bạn chưa đăng nhập. Hãy đăng nhập tài khoản ADMIN để tải dữ liệu dashboard.",
           );
           setIsLoading(false);
         }
         return;
       }
 
-      const adminHeaders = { "x-admin-api-key": ADMIN_API_KEY };
-      const bearerHeaders = storedToken
-        ? { Authorization: `Bearer ${storedToken}` }
-        : null;
+      const adminHeaders = { Authorization: `Bearer ${storedToken}` };
+      const bearerHeaders = { Authorization: `Bearer ${storedToken}` };
 
       const adminRequests = await Promise.allSettled([
         fetchJson("/api/v1/admin/pois", { headers: adminHeaders }),
+        fetchJson("/api/v1/admin/partner-registration-requests", {
+          headers: adminHeaders,
+        }),
         fetchJson("/api/v1/admin/tts/queue/status", { headers: adminHeaders }),
         fetchJson("/api/v1/admin/tts/config/validate", {
           headers: adminHeaders,
@@ -345,41 +372,39 @@ export default function AdminDashboard() {
       }
 
       if (adminRequests[1].status === "fulfilled") {
-        setTtsQueueStatus(adminRequests[1].value);
+        setPartnerRegistrationRequests(adminRequests[1].value.items ?? []);
       } else {
-        setTtsQueueStatus(null);
-        errors.push(`TTS queue: ${adminRequests[1].reason.message}`);
+        setPartnerRegistrationRequests([]);
+        errors.push(
+          `Partner registrations: ${adminRequests[1].reason.message}`,
+        );
       }
 
       if (adminRequests[2].status === "fulfilled") {
-        setTtsValidation(adminRequests[2].value);
+        setTtsQueueStatus(adminRequests[2].value);
       } else {
-        setTtsValidation(null);
-        errors.push(`TTS config: ${adminRequests[2].reason.message}`);
+        setTtsQueueStatus(null);
+        errors.push(`TTS queue: ${adminRequests[2].reason.message}`);
       }
 
-      if (bearerHeaders) {
-        const userRequests = await Promise.allSettled([
-          fetchJson("/api/v1/sync/manifest", { headers: bearerHeaders }),
-          fetchJson("/api/v1/analytics/stats", { headers: bearerHeaders }),
-        ]);
-
-        if (userRequests[0].status === "fulfilled") {
-          setSyncManifest(userRequests[0].value);
-        } else {
-          setSyncManifest(null);
-          errors.push(`Sync manifest: ${userRequests[0].reason.message}`);
-        }
-
-        if (userRequests[1].status === "fulfilled") {
-          setAnalyticsStats(userRequests[1].value.data ?? null);
-        } else {
-          setAnalyticsStats(null);
-          errors.push(`Analytics: ${userRequests[1].reason.message}`);
-        }
+      if (adminRequests[3].status === "fulfilled") {
+        setTtsValidation(adminRequests[3].value);
       } else {
-        setSyncManifest(null);
+        setTtsValidation(null);
+        errors.push(`TTS config: ${adminRequests[3].reason.message}`);
+      }
+
+      setSyncManifest(null);
+
+      const analyticsResult = await Promise.allSettled([
+        fetchJson("/api/v1/analytics/stats", { headers: bearerHeaders }),
+      ]);
+
+      if (analyticsResult[0].status === "fulfilled") {
+        setAnalyticsStats(analyticsResult[0].value.data ?? null);
+      } else {
         setAnalyticsStats(null);
+        errors.push(`Analytics: ${analyticsResult[0].reason.message}`);
       }
 
       if (!cancelled) {
@@ -403,6 +428,36 @@ export default function AdminDashboard() {
       cancelled = true;
     };
   }, [reloadTick, storedToken]);
+
+  const handleReviewPartnerRegistrationRequest = async (requestId, action) => {
+    const decisionWord = action === "approve" ? "duyệt" : "từ chối";
+    const decisionNote = window.prompt(
+      `Nhập ghi chú khi ${decisionWord} yêu cầu này (có thể để trống):`,
+      "",
+    );
+
+    try {
+      await fetchJson(
+        `/api/v1/admin/partner-registration-requests/${requestId}/${action}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${storedToken}`,
+          },
+          body: JSON.stringify({
+            decisionNote: decisionNote?.trim() || undefined,
+          }),
+        },
+      );
+      setReloadTick((tick) => tick + 1);
+    } catch (error) {
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : "Không thể xử lý yêu cầu đăng ký đối tác.",
+      );
+    }
+  };
 
   const totalPois = adminPois.length;
   const publishedPois = adminPois.filter((poi) => poi.isPublished).length;
@@ -503,11 +558,11 @@ export default function AdminDashboard() {
     if (item.key === "adminAuth") {
       return {
         ...item,
-        status: ADMIN_API_KEY ? "Configured" : "Missing key",
-        subtitle: ADMIN_API_KEY
-          ? "Admin access is enabled"
-          : "Set VITE_ADMIN_API_KEY",
-        tone: ADMIN_API_KEY ? "emerald" : "rose",
+        status: storedToken ? "Token found" : "Not signed in",
+        subtitle: storedToken
+          ? "Using bearer auth for admin endpoints"
+          : "Sign in with ADMIN account",
+        tone: storedToken ? "emerald" : "rose",
       };
     }
 
@@ -529,7 +584,7 @@ export default function AdminDashboard() {
       status: syncManifest ? `v${syncManifest.contentVersion}` : "Unavailable",
       subtitle: syncManifest
         ? `${formatNumber(syncManifest.totalPois)} POIs • ${formatNumber(syncManifest.totalTours)} tours`
-        : "Requires bearer token",
+        : "Sync manifest endpoint is USER-only",
       tone: syncManifest ? "emerald" : "slate",
     };
   });
@@ -546,6 +601,21 @@ export default function AdminDashboard() {
   const latestUpdatedLabel = adminPois[0]?.updatedAt
     ? formatRelativeTime(adminPois[0].updatedAt)
     : "No POIs loaded";
+  const partnerRegistrationRows = partnerRegistrationRequests
+    .slice(0, 8)
+    .map((item) => ({
+      id: item.id,
+      requester: item.requestedBy,
+      shopName: item.shopName,
+      shopAddress: item.shopAddress,
+      status: item.status,
+      note: item.note,
+      decisionNote: item.decisionNote,
+      reviewedAt: item.reviewedAt,
+      createdAt: item.createdAt,
+      tone: getPartnerRegistrationTone(item.status),
+      label: getPartnerRegistrationLabel(item.status),
+    }));
 
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-950 text-white">
@@ -731,6 +801,110 @@ export default function AdminDashboard() {
             {dashboardStats.map((item) => (
               <DashboardMetric key={item.title} {...item} />
             ))}
+          </section>
+
+          <section className="mt-6 rounded-[34px] border border-white/10 bg-white/6 p-5 md:p-6 backdrop-blur-xl shadow-[0_24px_80px_rgba(2,6,23,0.24)]">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/45">
+                  Partner onboarding
+                </p>
+                <h2 className="mt-2 text-2xl font-black text-white">
+                  Registration requests
+                </h2>
+              </div>
+              <StatusPill
+                tone={partnerRegistrationRows.length ? "amber" : "slate"}
+              >
+                {formatNumber(partnerRegistrationRows.length)} queued
+              </StatusPill>
+            </div>
+
+            {partnerRegistrationRows.length === 0 ? (
+              <div className="mt-5 rounded-[28px] border border-white/8 bg-black/10 p-4 text-sm text-white/60">
+                No partner registration requests available.
+              </div>
+            ) : (
+              <div className="mt-5 grid gap-3">
+                {partnerRegistrationRows.map((item) => {
+                  const isPending = item.status === "PENDING";
+                  return (
+                    <div
+                      key={item.id}
+                      className="rounded-[28px] border border-white/8 bg-black/10 p-4"
+                    >
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-semibold text-white">
+                              {item.shopName || "Untitled request"}
+                            </p>
+                            <StatusPill tone={item.tone}>
+                              {item.label}
+                            </StatusPill>
+                          </div>
+                          <p className="mt-1 text-sm text-white/60">
+                            {item.shopAddress}
+                          </p>
+                          <p className="mt-2 text-xs text-white/45">
+                            Requested by: {item.requester} •{" "}
+                            {formatRelativeTime(item.createdAt)}
+                          </p>
+                          {item.note && (
+                            <p className="mt-2 text-sm text-white/70">
+                              Note: {item.note}
+                            </p>
+                          )}
+                          {item.decisionNote && (
+                            <p className="mt-2 text-sm text-white/70">
+                              Decision: {item.decisionNote}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 lg:justify-end">
+                          {isPending ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleReviewPartnerRegistrationRequest(
+                                    item.id,
+                                    "approve",
+                                  )
+                                }
+                                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:brightness-105"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleReviewPartnerRegistrationRequest(
+                                    item.id,
+                                    "reject",
+                                  )
+                                }
+                                className="inline-flex items-center gap-2 rounded-2xl border border-rose-300/20 bg-rose-400/10 px-4 py-2 text-sm font-semibold text-rose-100 transition hover:bg-rose-400/15"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          ) : (
+                            <span className="inline-flex items-center rounded-2xl border border-white/10 bg-white/8 px-4 py-2 text-sm font-semibold text-white/70">
+                              Reviewed{" "}
+                              {item.reviewedAt
+                                ? formatRelativeTime(item.reviewedAt)
+                                : ""}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           <section className="mt-6 grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">

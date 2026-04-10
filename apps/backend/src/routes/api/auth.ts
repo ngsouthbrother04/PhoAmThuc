@@ -247,7 +247,7 @@ router.post(
   asyncHandler(async (req: AuthRequest, res) => {
     const text = typeof req.body?.text === "string" ? req.body.text : "";
     const language =
-      typeof req.body?.language === "string" ? req.body.language : "vi";
+      typeof req.body?.language === "string" ? req.body.language : "auto";
 
     if (!text.trim()) {
       throw new ApiError(400, "Thiếu mô tả để tạo audio test.");

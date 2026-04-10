@@ -10,15 +10,15 @@ vi.mock('../src/services/imageService', () => ({
   uploadTourImage: vi.fn()
 }));
 
-vi.mock('../src/services/partnerApprovalService', () => ({
-  createPartnerApprovalRequest: vi.fn(),
-  listApprovalRequestsByRequester: vi.fn(),
-  getApprovalRequestByIdForRequester: vi.fn()
-}));
-
 vi.mock('../src/services/poiAdminService', () => ({
+  createAdminPoi: vi.fn(),
+  createAdminTour: vi.fn(),
+  deleteAdminPoi: vi.fn(),
+  deleteAdminTour: vi.fn(),
   getAdminPoiById: vi.fn(),
-  getAdminTourById: vi.fn()
+  getAdminTourById: vi.fn(),
+  updateAdminPoi: vi.fn(),
+  updateAdminTour: vi.fn()
 }));
 
 vi.mock('../src/services/authService', () => ({
@@ -29,11 +29,15 @@ vi.mock('../src/services/authService', () => ({
 
 import { uploadPoiImage, uploadTourImage } from '../src/services/imageService';
 import {
-  createPartnerApprovalRequest,
-  listApprovalRequestsByRequester,
-  getApprovalRequestByIdForRequester
-} from '../src/services/partnerApprovalService';
-import { getAdminPoiById, getAdminTourById } from '../src/services/poiAdminService';
+  createAdminPoi,
+  createAdminTour,
+  deleteAdminPoi,
+  deleteAdminTour,
+  getAdminPoiById,
+  getAdminTourById,
+  updateAdminPoi,
+  updateAdminTour
+} from '../src/services/poiAdminService';
 import { getCurrentUserRole, isAccessTokenSessionActive, verifyJwt } from '../src/services/authService';
 
 const PARTNER_AUTH_HEADER = 'Bearer partner-token';
@@ -57,23 +61,11 @@ describe('PARTNER routes', () => {
     vi.mocked(getAdminTourById).mockResolvedValue({ id: 'tour-1' } as never);
   });
 
-  it('POST /api/v1/partner/pois should submit create request', async () => {
+  it('POST /api/v1/partner/pois should create POI directly', async () => {
     const app = createApp();
-    vi.mocked(createPartnerApprovalRequest).mockResolvedValue({
-      id: 'req-1',
-      entityType: 'POI',
-      actionType: 'CREATE',
-      targetId: null,
-      payload: { name: { vi: 'Phở Thìn' } },
-      status: 'PENDING',
-      reason: 'new poi',
-      decisionNote: null,
-      requestedBy: 'partner-1',
-      reviewedBy: null,
-      resultSnapshot: null,
-      reviewedAt: null,
-      createdAt: new Date('2026-03-26T00:00:00Z').toISOString(),
-      updatedAt: new Date('2026-03-26T00:00:00Z').toISOString()
+    vi.mocked(createAdminPoi).mockResolvedValue({
+      id: 'poi-1',
+      name: { vi: 'Phở Thìn' }
     } as never);
 
     const res = await request(app)
@@ -89,13 +81,107 @@ describe('PARTNER routes', () => {
       });
 
     expect(res.status).toBe(201);
-    expect(res.body.id).toBe('req-1');
-    expect(createPartnerApprovalRequest).toHaveBeenCalledWith(
+    expect(res.body.data.id).toBe('poi-1');
+    expect(createAdminPoi).toHaveBeenCalledWith(
       expect.objectContaining({
-        requestedBy: 'partner-1',
-        entityType: 'POI',
-        actionType: 'CREATE'
+        creatorId: 'partner-1'
+      }),
+      expect.objectContaining({
+        actor: 'partner-1'
       })
+    );
+  });
+
+  it('PUT /api/v1/partner/pois/:id should update POI directly', async () => {
+    const app = createApp();
+    vi.mocked(updateAdminPoi).mockResolvedValue({ id: 'poi-1' } as never);
+
+    const res = await request(app)
+      .put('/api/v1/partner/pois/poi-1')
+      .set('Authorization', PARTNER_AUTH_HEADER)
+      .send({ name: { vi: 'Phở Thìn mới' } });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.id).toBe('poi-1');
+    expect(updateAdminPoi).toHaveBeenCalledWith(
+      'poi-1',
+      expect.objectContaining({ name: { vi: 'Phở Thìn mới' } }),
+      { actorId: 'partner-1', role: 'PARTNER' },
+      expect.objectContaining({ actor: 'partner-1' })
+    );
+  });
+
+  it('DELETE /api/v1/partner/pois/:id should delete POI directly', async () => {
+    const app = createApp();
+    vi.mocked(deleteAdminPoi).mockResolvedValue({ id: 'poi-1' } as never);
+
+    const res = await request(app)
+      .delete('/api/v1/partner/pois/poi-1')
+      .set('Authorization', PARTNER_AUTH_HEADER);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.id).toBe('poi-1');
+    expect(deleteAdminPoi).toHaveBeenCalledWith(
+      'poi-1',
+      { actorId: 'partner-1', role: 'PARTNER' },
+      expect.objectContaining({ actor: 'partner-1' })
+    );
+  });
+
+  it('POST /api/v1/partner/tours should create Tour directly', async () => {
+    const app = createApp();
+    vi.mocked(createAdminTour).mockResolvedValue({ id: 'tour-1' } as never);
+
+    const res = await request(app)
+      .post('/api/v1/partner/tours')
+      .set('Authorization', PARTNER_AUTH_HEADER)
+      .send({
+        name: { vi: 'Tour phố cổ' },
+        description: { vi: 'Mô tả' },
+        poiIds: ['poi-1']
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.id).toBe('tour-1');
+    expect(createAdminTour).toHaveBeenCalledWith(
+      expect.objectContaining({ creatorId: 'partner-1' }),
+      expect.objectContaining({ actor: 'partner-1' })
+    );
+  });
+
+  it('PUT /api/v1/partner/tours/:id should update Tour directly', async () => {
+    const app = createApp();
+    vi.mocked(updateAdminTour).mockResolvedValue({ id: 'tour-1' } as never);
+
+    const res = await request(app)
+      .put('/api/v1/partner/tours/tour-1')
+      .set('Authorization', PARTNER_AUTH_HEADER)
+      .send({ name: { vi: 'Tour mới' } });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.id).toBe('tour-1');
+    expect(updateAdminTour).toHaveBeenCalledWith(
+      'tour-1',
+      expect.objectContaining({ name: { vi: 'Tour mới' } }),
+      { actorId: 'partner-1', role: 'PARTNER' },
+      expect.objectContaining({ actor: 'partner-1' })
+    );
+  });
+
+  it('DELETE /api/v1/partner/tours/:id should delete Tour directly', async () => {
+    const app = createApp();
+    vi.mocked(deleteAdminTour).mockResolvedValue({ id: 'tour-1' } as never);
+
+    const res = await request(app)
+      .delete('/api/v1/partner/tours/tour-1')
+      .set('Authorization', PARTNER_AUTH_HEADER);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.id).toBe('tour-1');
+    expect(deleteAdminTour).toHaveBeenCalledWith(
+      'tour-1',
+      { actorId: 'partner-1', role: 'PARTNER' },
+      expect.objectContaining({ actor: 'partner-1' })
     );
   });
 
@@ -177,21 +263,18 @@ describe('PARTNER routes', () => {
     expect(getAdminTourById).toHaveBeenCalledWith('tour-foreign', { actorId: 'partner-1', role: 'PARTNER' });
   });
 
-  it('GET /api/v1/partner/approval-requests/mine should list my requests', async () => {
+  it('GET /api/v1/partner/approval-requests/mine should return 404 (deprecated endpoint)', async () => {
     const app = createApp();
-    vi.mocked(listApprovalRequestsByRequester).mockResolvedValue([]);
 
     const res = await request(app)
       .get('/api/v1/partner/approval-requests/mine?status=PENDING')
       .set('Authorization', PARTNER_AUTH_HEADER);
 
-    expect(res.status).toBe(200);
-    expect(res.body.total).toBe(0);
+    expect(res.status).toBe(404);
   });
 
-  it('GET /api/v1/partner/approval-requests/mine/:id should return 404 when owner mismatch', async () => {
+  it('GET /api/v1/partner/approval-requests/mine/:id should return 404 (deprecated endpoint)', async () => {
     const app = createApp();
-    vi.mocked(getApprovalRequestByIdForRequester).mockRejectedValue(new ApiError(404, 'Không tìm thấy approval request.'));
 
     const res = await request(app)
       .get('/api/v1/partner/approval-requests/mine/req-other')

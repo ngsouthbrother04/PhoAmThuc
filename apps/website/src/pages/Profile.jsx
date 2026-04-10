@@ -27,7 +27,6 @@ export default function Profile() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [partnerDraft, setPartnerDraft] = useState(null);
   const t = useTranslation();
   const { showSuccess, showError, showInfo } = useToast();
   const token = localStorage.getItem("accessToken");
@@ -73,20 +72,6 @@ export default function Profile() {
 
     loadProfile();
   }, [token]);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("partnerRequestDraft");
-    if (!saved) return;
-
-    try {
-      const parsed = JSON.parse(saved);
-      if (parsed && parsed.shopName && parsed.address) {
-        setPartnerDraft(parsed);
-      }
-    } catch {
-      // Ignore malformed local draft
-    }
-  }, []);
 
   if (!token) {
     return <Navigate to="/login" replace />;
@@ -249,9 +234,9 @@ export default function Profile() {
                     Khu vực đối tác
                   </p>
                   <p className="mt-1 text-xs text-emerald-700">
-                    {partnerDraft
-                      ? "Bạn đã có yêu cầu đối tác ở trạng thái chờ duyệt (UI)."
-                      : "Bạn có thể đăng ký trở thành đối tác tại trang riêng."}
+                    {String(profile.role || "USER").toUpperCase() === "PARTNER"
+                      ? "Tài khoản của bạn đã là PARTNER. Bạn có thể tạo POI từ trang đối tác."
+                      : "Bạn có thể gửi yêu cầu đăng ký trở thành đối tác tại trang riêng để ADMIN duyệt."}
                   </p>
                 </div>
                 <Link

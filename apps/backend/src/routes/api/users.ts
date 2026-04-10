@@ -7,6 +7,11 @@ import {
   updateUserProfile,
   getUserFavoritePois,
 } from "../../services/userService";
+import {
+  createPartnerRegistrationRequest,
+  getLatestPartnerRegistrationRequestByRequester,
+  listPartnerRegistrationRequestsByRequester,
+} from "../../services/partnerRegistrationService";
 import { synthesizePreviewAudioFromText } from "../../services/ttsService";
 
 const router = Router();
@@ -108,7 +113,7 @@ const handleTtsPreview = asyncHandler(async (req: AuthRequest, res) => {
 
   const text = typeof req.body?.text === "string" ? req.body.text : "";
   const language =
-    typeof req.body?.language === "string" ? req.body.language : "vi";
+    typeof req.body?.language === "string" ? req.body.language : "auto";
 
   if (!text.trim()) {
     throw new ApiError(400, "Thiếu mô tả để tạo audio test.");
@@ -169,5 +174,59 @@ const handleTtsPreview = asyncHandler(async (req: AuthRequest, res) => {
 router.post("/me/tts-preview", requireAuth, handleTtsPreview);
 
 router.post("/tts-preview", requireAuth, handleTtsPreview);
+
+router.post(
+  "/me/partner-registration-requests",
+  requireAuth,
+  asyncHandler(async (req: AuthRequest, res) => {
+    const userId = requireUserId(req);
+    const shopName = typeof req.body?.shopName === "string" ? req.body.shopName : "";
+    const shopAddress = typeof req.body?.shopAddress === "string" ? req.body.shopAddress : "";
+    const note = typeof req.body?.note === "string" ? req.body.note : undefined;
+
+    const item = await createPartnerRegistrationRequest({
+      requestedBy: userId,
+      shopName,
+      shopAddress,
+      note,
+    });
+
+    return res.status(201).json({
+      message: "Đã gửi yêu cầu đăng ký đối tác. Vui lòng chờ ADMIN duyệt.",
+      data: item,
+    });
+  }),
+);
+
+router.get(
+  "/me/partner-registration-requests",
+  requireAuth,
+  asyncHandler(async (req: AuthRequest, res) => {
+    const userId = requireUserId(req);
+    const items = await listPartnerRegistrationRequestsByRequester(userId);
+
+    return res.status(200).json({
+      status: "success",
+      data: {
+        items,
+        total: items.length,
+      },
+    });
+  }),
+);
+
+router.get(
+  "/me/partner-registration-requests/latest",
+  requireAuth,
+  asyncHandler(async (req: AuthRequest, res) => {
+    const userId = requireUserId(req);
+    const item = await getLatestPartnerRegistrationRequestByRequester(userId);
+
+    return res.status(200).json({
+      status: "success",
+      data: item,
+    });
+  }),
+);
 
 export default router;

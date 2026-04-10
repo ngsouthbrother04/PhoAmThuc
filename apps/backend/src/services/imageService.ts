@@ -1,5 +1,5 @@
-import { v2 as cloudinary } from 'cloudinary';
-import prisma from '../lib/prisma';
+import { v2 as cloudinary } from "cloudinary";
+import prisma from "../lib/prisma";
 
 export interface UploadPoiImageResult {
   poiId: string;
@@ -13,12 +13,12 @@ export interface UploadTourImageResult {
   contentVersion: number;
 }
 
-function getCloudinaryFolder(entity: 'poi' | 'tour'): string {
-  if (entity === 'tour') {
-    return process.env.CLOUDINARY_TOUR_FOLDER?.trim() || 'phoamthuc/tours';
+function getCloudinaryFolder(entity: "poi" | "tour"): string {
+  if (entity === "tour") {
+    return process.env.CLOUDINARY_TOUR_FOLDER?.trim() || "phoamthuc/tours";
   }
 
-  return process.env.CLOUDINARY_POI_FOLDER?.trim() || 'phoamthuc/pois';
+  return process.env.CLOUDINARY_POI_FOLDER?.trim() || "phoamthuc/pois";
 }
 
 function getImageMaxWidth(): number {
@@ -36,14 +36,14 @@ function ensureCloudinaryConfig(): void {
   const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim();
 
   if (!cloudName || !apiKey || !apiSecret) {
-    throw new Error('CLOUDINARY_NOT_CONFIGURED');
+    throw new Error("CLOUDINARY_NOT_CONFIGURED");
   }
 
   cloudinary.config({
     cloud_name: cloudName,
     api_key: apiKey,
     api_secret: apiSecret,
-    secure: true
+    secure: true,
   });
 }
 
@@ -55,8 +55,12 @@ function extractCloudinaryPublicId(imageUrl: string): string | null {
 
   try {
     const parsed = new URL(imageUrl);
-    const hostParts = parsed.hostname.split('.');
-    if (hostParts.length < 3 || hostParts[0] !== 'res' || hostParts[1] !== 'cloudinary') {
+    const hostParts = parsed.hostname.split(".");
+    if (
+      hostParts.length < 3 ||
+      hostParts[0] !== "res" ||
+      hostParts[1] !== "cloudinary"
+    ) {
       return null;
     }
 
@@ -68,18 +72,18 @@ function extractCloudinaryPublicId(imageUrl: string): string | null {
     }
 
     const remainder = path.slice(cloudIndex + cloudSegment.length);
-    const uploadIndex = remainder.indexOf('upload/');
+    const uploadIndex = remainder.indexOf("upload/");
     if (uploadIndex === -1) {
       return null;
     }
 
-    let publicPath = remainder.slice(uploadIndex + 'upload/'.length);
+    let publicPath = remainder.slice(uploadIndex + "upload/".length);
     if (!publicPath) {
       return null;
     }
 
-    if (publicPath.startsWith('v')) {
-      const slashIndex = publicPath.indexOf('/');
+    if (publicPath.startsWith("v")) {
+      const slashIndex = publicPath.indexOf("/");
       if (slashIndex === -1) {
         return null;
       }
@@ -90,14 +94,17 @@ function extractCloudinaryPublicId(imageUrl: string): string | null {
       }
     }
 
-    const withoutExt = publicPath.replace(/\.[^/.]+$/, '');
+    const withoutExt = publicPath.replace(/\.[^/.]+$/, "");
     return withoutExt || null;
   } catch {
     return null;
   }
 }
 
-async function cleanupOldCloudinaryImage(oldImageUrl: string | null | undefined, newImageUrl: string): Promise<void> {
+async function cleanupOldCloudinaryImage(
+  oldImageUrl: string | null | undefined,
+  newImageUrl: string,
+): Promise<void> {
   if (!oldImageUrl || oldImageUrl === newImageUrl) {
     return;
   }
@@ -109,18 +116,20 @@ async function cleanupOldCloudinaryImage(oldImageUrl: string | null | undefined,
 
   try {
     await cloudinary.uploader.destroy(oldPublicId, {
-      resource_type: 'image',
-      invalidate: true
+      resource_type: "image",
+      invalidate: true,
     });
   } catch (error) {
-    console.warn('[Cloudinary] Failed to cleanup old image', {
+    console.warn("[Cloudinary] Failed to cleanup old image", {
       oldPublicId,
-      error
+      error,
     });
   }
 }
 
-export async function removeCloudinaryImageByUrl(imageUrl: string | null | undefined): Promise<boolean> {
+export async function removeCloudinaryImageByUrl(
+  imageUrl: string | null | undefined,
+): Promise<boolean> {
   if (!imageUrl) {
     return false;
   }
@@ -133,8 +142,8 @@ export async function removeCloudinaryImageByUrl(imageUrl: string | null | undef
   }
 
   await cloudinary.uploader.destroy(publicId, {
-    resource_type: 'image',
-    invalidate: true
+    resource_type: "image",
+    invalidate: true,
   });
 
   return true;
@@ -142,8 +151,8 @@ export async function removeCloudinaryImageByUrl(imageUrl: string | null | undef
 
 function uploadImageBufferToCloudinary(
   entityId: string,
-  entity: 'poi' | 'tour',
-  file: Express.Multer.File
+  entity: "poi" | "tour",
+  file: Express.Multer.File,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const timestamp = Date.now();
@@ -151,58 +160,61 @@ function uploadImageBufferToCloudinary(
       {
         folder: getCloudinaryFolder(entity),
         public_id: `${entityId}-${timestamp}`,
-        resource_type: 'image',
+        resource_type: "image",
         transformation: [
           {
             width: getImageMaxWidth(),
-            crop: 'limit'
+            crop: "limit",
           },
           {
-            fetch_format: 'auto',
-            quality: 'auto'
-          }
-        ]
+            fetch_format: "auto",
+            quality: "auto",
+          },
+        ],
       },
       (error, result) => {
         if (error || !result?.secure_url) {
-          reject(error ?? new Error('CLOUDINARY_UPLOAD_FAILED'));
+          reject(error ?? new Error("CLOUDINARY_UPLOAD_FAILED"));
           return;
         }
 
         resolve(result.secure_url);
-      }
+      },
     );
 
     uploader.end(file.buffer);
   });
 }
 
-export async function uploadPoiImage(poiId: string, file: Express.Multer.File): Promise<UploadPoiImageResult> {
+export async function uploadPoiImage(
+  poiId: string,
+  file: Express.Multer.File,
+): Promise<UploadPoiImageResult> {
   ensureCloudinaryConfig();
 
   const poi = await prisma.pointOfInterest.findUnique({
     where: { id: poiId },
-    select: { id: true, image: true }
+    select: { id: true, image: true },
   });
 
   if (!poi) {
-    throw new Error('POI_NOT_FOUND');
+    throw new Error("POI_NOT_FOUND");
   }
 
-  const imageUrl = await uploadImageBufferToCloudinary(poiId, 'poi', file);
+  const imageUrl = await uploadImageBufferToCloudinary(poiId, "poi", file);
   const updatedPoi = await prisma.pointOfInterest.update({
     where: { id: poiId },
     data: {
       image: imageUrl,
       contentVersion: {
-        increment: 1
-      }
+        increment: 1,
+      },
     },
     select: {
       id: true,
       image: true,
-      contentVersion: true
-    }
+      contentVersion: true,
+    },
   });
 
   await cleanupOldCloudinaryImage(poi.image, updatedPoi.image ?? imageUrl);
@@ -210,36 +222,39 @@ export async function uploadPoiImage(poiId: string, file: Express.Multer.File): 
   return {
     poiId: updatedPoi.id,
     imageUrl: updatedPoi.image ?? imageUrl,
-    contentVersion: updatedPoi.contentVersion
+    contentVersion: updatedPoi.contentVersion,
   };
 }
 
-export async function uploadTourImage(tourId: string, file: Express.Multer.File): Promise<UploadTourImageResult> {
+export async function uploadTourImage(
+  tourId: string,
+  file: Express.Multer.File,
+): Promise<UploadTourImageResult> {
   ensureCloudinaryConfig();
 
   const tour = await prisma.tour.findUnique({
     where: { id: tourId },
-    select: { id: true, image: true }
+    select: { id: true, image: true },
   });
 
   if (!tour) {
-    throw new Error('TOUR_NOT_FOUND');
+    throw new Error("TOUR_NOT_FOUND");
   }
 
-  const imageUrl = await uploadImageBufferToCloudinary(tourId, 'tour', file);
+  const imageUrl = await uploadImageBufferToCloudinary(tourId, "tour", file);
   const updatedTour = await prisma.tour.update({
     where: { id: tourId },
     data: {
       image: imageUrl,
       contentVersion: {
-        increment: 1
-      }
+        increment: 1,
+      },
     },
     select: {
       id: true,
       image: true,
-      contentVersion: true
-    }
+      contentVersion: true,
+    },
   });
 
   await cleanupOldCloudinaryImage(tour.image, updatedTour.image ?? imageUrl);
@@ -247,6 +262,35 @@ export async function uploadTourImage(tourId: string, file: Express.Multer.File)
   return {
     tourId: updatedTour.id,
     imageUrl: updatedTour.image ?? imageUrl,
-    contentVersion: updatedTour.contentVersion
+    contentVersion: updatedTour.contentVersion,
   };
+}
+
+export async function uploadAudioBufferToCloudinary(
+  poiId: string,
+  entity: "poi",
+  fileName: string,
+  audioBuffer: Buffer,
+): Promise<string> {
+  ensureCloudinaryConfig();
+
+  return new Promise((resolve, reject) => {
+    const uploader = cloudinary.uploader.upload_stream(
+      {
+        folder: `${getCloudinaryFolder(entity)}/audio`,
+        public_id: fileName.replace(/\.[^.]+$/, ""),
+        resource_type: "auto",
+      },
+      (error, result) => {
+        if (error || !result?.secure_url) {
+          reject(error ?? new Error("CLOUDINARY_AUDIO_UPLOAD_FAILED"));
+          return;
+        }
+
+        resolve(result.secure_url);
+      },
+    );
+
+    uploader.end(audioBuffer);
+  });
 }

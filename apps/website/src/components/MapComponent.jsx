@@ -8,9 +8,13 @@ import {
   Tooltip,
 } from "react-leaflet";
 import L from "leaflet";
-import { Search, Mic, SlidersHorizontal, Headphones } from "lucide-react";
+import { Search } from "lucide-react";
 import { poisAPI } from "../lib/api";
-import { useLanguage, pickLocalizedText, useTranslation } from "../hooks/useLanguageContext";
+import {
+  useLanguage,
+  pickLocalizedText,
+  useTranslation,
+} from "../hooks/useLanguageContext";
 import "leaflet/dist/leaflet.css";
 import POIDetailPanel from "./POIDetailPanel";
 
@@ -26,6 +30,26 @@ L.Icon.Default.mergeOptions({
 });
 
 const AUTOPLAY_SESSION_KEY = "phoamthuc-autoplay-poi-ids";
+const DEFAULT_POI_RADIUS_METERS = 120;
+const DEFAULT_POSITION = [10.7769, 106.7009];
+const POI_TYPE_LABEL = {
+  FOOD: "Food",
+  DRINK: "Drink",
+  SNACK: "Snack",
+  WC: "WC",
+};
+
+const resolvePrimaryAudioUrl = (audioUrls, language) => {
+  if (!audioUrls || typeof audioUrls !== "object") return "";
+
+  return (
+    audioUrls[language] ||
+    audioUrls.vi ||
+    audioUrls.en ||
+    Object.values(audioUrls)[0] ||
+    ""
+  );
+};
 
 const calculateDistanceMeters = (lat1, lng1, lat2, lng2) => {
   const toRad = (value) => (value * Math.PI) / 180;
@@ -54,23 +78,40 @@ export default function MapComponent() {
   const [autoPlaySignal, setAutoPlaySignal] = useState(0);
   const [toastMessage, setToastMessage] = useState("");
   const [, setIsLoadingPOIs] = useState(false);
-  const [poiRadiusById, setPoiRadiusById] = useState({});
   const enteredPoiIdsRef = useRef(new Set());
   const autoplayedPoiIdsRef = useRef(new Set());
   const { language } = useLanguage();
   const t = useTranslation();
 
-  const defaultPosition = [10.7769, 106.7009];
-
   // Normalize POIs based on current language
   const pois = useMemo(
     () =>
-      (poisRaw || []).map((poi) => ({
-        ...poi,
-        name: pickLocalizedText(poi.name, language, "Untitled POI"),
-        description: pickLocalizedText(poi.description, language, ""),
-        descriptionVi: pickLocalizedText(poi.description, language, ""),
-      })),
+      (poisRaw || []).map((poi) => {
+        const latitude = Number(poi.latitude);
+        const longitude = Number(poi.longitude);
+        const radius = Number(poi.radius);
+        const normalizedRadius =
+          Number.isFinite(radius) && radius > 0
+            ? radius
+            : DEFAULT_POI_RADIUS_METERS;
+        const audioUrl = resolvePrimaryAudioUrl(poi.audioUrls, language);
+
+        return {
+          ...poi,
+          latitude: Number.isFinite(latitude) ? latitude : DEFAULT_POSITION[0],
+          longitude: Number.isFinite(longitude)
+            ? longitude
+            : DEFAULT_POSITION[1],
+          radius: normalizedRadius,
+          name: pickLocalizedText(poi.name, language, "Untitled POI"),
+          description: pickLocalizedText(poi.description, language, ""),
+          descriptionVi: pickLocalizedText(poi.description, "vi", ""),
+          categoryLabel:
+            POI_TYPE_LABEL[String(poi.type || "").toUpperCase()] ||
+            String(poi.type || "POI"),
+          audioUrl,
+        };
+      }),
     [poisRaw, language],
   );
 
@@ -81,21 +122,18 @@ export default function MapComponent() {
       .toLowerCase();
 
   // Fetch POIs when map bounds change
-  const fetchPOIsByBounds = useCallback(
-    async (north, south, east, west) => {
-      try {
-        setIsLoadingPOIs(true);
-        const data = await poisAPI.getByBounds(north, south, east, west);
-        setPoisRaw(data || []);
-      } catch (err) {
-        console.error("Failed to fetch POIs:", err);
-        setPoisRaw([]);
-      } finally {
-        setIsLoadingPOIs(false);
-      }
-    },
-    [],
-  );
+  const fetchPOIsByBounds = useCallback(async (north, south, east, west) => {
+    try {
+      setIsLoadingPOIs(true);
+      const data = await poisAPI.getByBounds(north, south, east, west);
+      setPoisRaw(data || []);
+    } catch (err) {
+      console.error("Failed to fetch POIs:", err);
+      setPoisRaw([]);
+    } finally {
+      setIsLoadingPOIs(false);
+    }
+  }, []);
 
   // Load initial POIs when map instance is ready
   useEffect(() => {
@@ -185,7 +223,6 @@ export default function MapComponent() {
         let nearestDistance = Number.POSITIVE_INFINITY;
 
         pois.forEach((poi) => {
-          const poiRadius = poiRadiusById[poi.id] || 120;
           const distance = calculateDistanceMeters(
             latitude,
             longitude,
@@ -193,7 +230,7 @@ export default function MapComponent() {
             poi.longitude,
           );
 
-          if (distance <= poiRadius) {
+          if (distance <= (Number(poi.radius) || DEFAULT_POI_RADIUS_METERS)) {
             insideNow.add(poi.id);
 
             if (
@@ -246,14 +283,7 @@ export default function MapComponent() {
     return () => {
       navigator.geolocation.clearWatch(watchId);
     };
-  }, [mapInstance, poiRadiusById, pois]);
-
-  const handleRadiusChange = (poiId, radius) => {
-    setPoiRadiusById((prev) => ({
-      ...prev,
-      [poiId]: radius,
-    }));
-  };
+  }, [mapInstance, pois]);
 
   const focusPOI = (poi) => {
     setSelectedPOI(poi);
@@ -269,8 +299,8 @@ export default function MapComponent() {
   return (
     <div className="w-full h-full relative">
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-4xl">
-        <div className="flex items-center rounded-2xl bg-white shadow-lg px-4 py-3 border border-gray-100">
-          <Search size={22} className="text-slate-400 shrink-0" />
+        <div className="flex items-center rounded-2xl border border-white/20 bg-transparent px-4 py-3 shadow-lg backdrop-blur-sm">
+          <Search size={22} className="shrink-0 text-slate-600" />
           <input
             type="text"
             value={searchText}
@@ -281,15 +311,8 @@ export default function MapComponent() {
               }
             }}
             placeholder={t.map.search}
-            className="flex-1 px-3 text-base outline-none text-slate-700 placeholder:text-slate-400"
+            className="flex-1 bg-transparent px-3 text-base text-slate-800 outline-none placeholder:text-slate-600"
           />
-          <button
-            type="button"
-            className="text-orange-500 hover:text-orange-600 transition"
-            aria-label={t.map.search}
-          >
-            <Mic size={22} />
-          </button>
         </div>
 
         {searchText.trim() && (
@@ -315,39 +338,10 @@ export default function MapComponent() {
             )}
           </div>
         )}
-
-        <details className="mt-2 rounded-2xl bg-white/95 shadow-lg border border-gray-100 overflow-hidden">
-          <summary className="cursor-pointer list-none px-4 py-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <SlidersHorizontal size={16} className="text-orange-500" />
-            {t.map.radiusLabel}
-          </summary>
-
-          <div className="px-4 pb-4 space-y-3 border-t border-gray-100">
-            {pois.map((poi) => (
-              <label key={`radius-${poi.id}`} className="block">
-                <div className="flex items-center justify-between mb-1 text-xs text-slate-600">
-                  <span className="font-medium">{poi.name}</span>
-                  <span>{poiRadiusById[poi.id]}m</span>
-                </div>
-                <input
-                  type="range"
-                  min="60"
-                  max="250"
-                  step="10"
-                  value={poiRadiusById[poi.id]}
-                  onChange={(event) =>
-                    handleRadiusChange(poi.id, Number(event.target.value))
-                  }
-                  className="w-full accent-orange-500"
-                />
-              </label>
-            ))}
-          </div>
-        </details>
       </div>
 
       <MapContainer
-        center={defaultPosition}
+        center={DEFAULT_POSITION}
         zoom={13}
         zoomControl={false}
         whenReady={(event) => setMapInstance(event.target)}
@@ -363,7 +357,7 @@ export default function MapComponent() {
           <Circle
             key={`geofence-${poi.id}`}
             center={[poi.latitude, poi.longitude]}
-            radius={poiRadiusById[poi.id] || 120}
+            radius={poi.radius}
             pathOptions={{
               color: "#f97316",
               fillColor: "#fb923c",
@@ -424,25 +418,8 @@ export default function MapComponent() {
                   <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-2.5 py-1 mb-2">
                     <span className="text-xs">🍜</span>
                     <span className="text-orange-500 font-semibold text-xs">
-                      {poi.category || "Food"}
+                      {poi.categoryLabel}
                     </span>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 border-t border-slate-200 pt-2">
-                    <div className="inline-flex items-center gap-1.5 text-slate-500 text-xs font-medium">
-                      <Headphones size={14} />
-                      <span className="whitespace-normal wrap-break-word">
-                        {poi.durationLabel || "~1m 10s"}
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => focusPOI(poi)}
-                      className="rounded-full bg-orange-500 px-3 py-1.5 text-white text-xs font-bold hover:bg-orange-600 transition"
-                    >
-                      Listen narration
-                    </button>
                   </div>
                 </div>
               </div>

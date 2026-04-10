@@ -232,12 +232,36 @@ model User {
   authSessions        AuthSession[]
   pois                PointOfInterest[]
   tours               Tour[]
+  partnerRegistrationRequests         PartnerRegistrationRequest[] @relation("PartnerRegistrationRequester")
+  reviewedPartnerRegistrationRequests PartnerRegistrationRequest[] @relation("PartnerRegistrationReviewer")
 
   @@index([claimCodeId], map: "idx_users_claim_code_id")
   @@index([isActive], map: "idx_users_is_active")
   @@index([role], map: "idx_users_role")
   @@index([tokenInvalidBefore], map: "idx_users_token_invalid_before")
   @@map("users")
+}
+
+model PartnerRegistrationRequest {
+  id           String         @id
+  requestedBy  String         @map("requested_by")
+  shopName     String         @map("shop_name")
+  shopAddress  String         @map("shop_address")
+  note         String?
+  status       ApprovalStatus @default(PENDING)
+  decisionNote String?        @map("decision_note")
+  reviewedBy   String?        @map("reviewed_by")
+  reviewedAt   DateTime?      @map("reviewed_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  requester User  @relation("PartnerRegistrationRequester", fields: [requestedBy], references: [id], onDelete: Cascade)
+  reviewer  User? @relation("PartnerRegistrationReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([requestedBy], map: "idx_partner_registration_requests_requested_by")
+  @@index([reviewedBy], map: "idx_partner_registration_requests_reviewed_by")
+  @@index([status, createdAt], map: "idx_partner_registration_requests_status_created_at")
+  @@map("partner_registration_requests")
 }
 
 model AuthSession {
@@ -299,25 +323,3 @@ model AnalyticsPresence {
   @@map("analytics_presence")
 }
 
-model PartnerApprovalRequest {
-  id             String             @id
-  entityType     ApprovalEntityType @map("entity_type")
-  actionType     ApprovalActionType @map("action_type")
-  targetId       String?            @map("target_id")
-  payload        Json               @default("{}")
-  status         ApprovalStatus     @default(PENDING)
-  reason         String?
-  decisionNote   String?            @map("decision_note")
-  requestedBy    String             @map("requested_by")
-  reviewedBy     String?            @map("reviewed_by")
-  resultSnapshot Json?              @map("result_snapshot")
-  reviewedAt     DateTime?          @map("reviewed_at")
-  createdAt      DateTime           @default(now()) @map("created_at")
-  updatedAt      DateTime           @updatedAt @map("updated_at")
-
-  @@index([status, createdAt], map: "idx_partner_approval_requests_status_created_at")
-  @@index([entityType, actionType], map: "idx_partner_approval_requests_entity_action")
-  @@index([requestedBy], map: "idx_partner_approval_requests_requested_by")
-  @@index([reviewedBy], map: "idx_partner_approval_requests_reviewed_by")
-  @@map("partner_approval_requests")
-}
