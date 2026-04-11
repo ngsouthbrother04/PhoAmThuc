@@ -8,37 +8,48 @@ import API from "../api/api";
 export default function RegisterScreen({ navigation }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [claimCode, setClaimCode] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const handleRegister = async () => {
-    if (!email || !password || !claimCode) {
+    // 1. Chỉ kiểm tra Email, Mật khẩu và Xác nhận mật khẩu
+    if (!email || !password || !confirmPassword) {
       Alert.alert("Lưu ý", "Vui lòng nhập đầy đủ thông tin!");
       return;
     }
 
+    // 2. Kiểm tra mật khẩu khớp nhau
+    if (password !== confirmPassword) {
+      Alert.alert("Lỗi", "Mật khẩu xác nhận không khớp!");
+      return;
+    }
+
+    // 3. Kiểm tra độ dài mật khẩu
+    if (password.length < 6) {
+      Alert.alert("Lỗi", "Mật khẩu phải có ít nhất 6 ký tự!");
+      return;
+    }
+
     try {
+      // Gửi yêu cầu đăng ký (Đã bỏ claimCode)
       const res = await API.post("/auth/register", {
         email,
         password,
-        claimCode,
       });
 
       Alert.alert("Thành công", "Tài khoản Phố Ẩm Thực đã sẵn sàng!", [
         { text: "Đăng nhập ngay", onPress: () => navigation.navigate("Login") }
       ]);
     } catch (err) {
-      const errorMsg = err.response?.data?.message || "Mã kích hoạt không đúng hoặc email đã tồn tại!";
+      const errorMsg = err.response?.data?.message || "Đăng ký thất bại, vui lòng thử lại!";
       Alert.alert("Lỗi đăng ký", errorMsg);
     }
   };
 
   return (
-    // 1. Dùng KeyboardAvoidingView để đẩy giao diện lên khi bàn phím hiện
     <KeyboardAvoidingView 
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      {/* 2. Dùng ScrollView để có thể cuộn nội dung khi màn hình bị chật */}
       <ScrollView 
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
@@ -49,6 +60,7 @@ export default function RegisterScreen({ navigation }) {
           <Text style={styles.subTitle}>Trở thành thành viên của Phố Ẩm Thực</Text>
         </View>
 
+        {/* Input Email */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Email</Text>
           <TextInput
@@ -61,6 +73,7 @@ export default function RegisterScreen({ navigation }) {
           />
         </View>
 
+        {/* Input Mật khẩu */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Mật khẩu</Text>
           <TextInput
@@ -72,17 +85,17 @@ export default function RegisterScreen({ navigation }) {
           />
         </View>
 
-        {/* <View style={styles.inputContainer}>
-          <Text style={styles.label}>Mã kích hoạt (Claim Code)</Text>
+        {/* Input Xác nhận mật khẩu */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Xác nhận mật khẩu</Text>
           <TextInput
-            placeholder="Nhập mã ưu đãi của bạn..."
-            value={claimCode}
-            onChangeText={setClaimCode}
-            style={[styles.input, styles.highlightInput]}
-            autoCapitalize="characters" // Tự viết hoa cho mã code
+            placeholder="Nhập lại mật khẩu..."
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry={true}
+            style={styles.input}
           />
-          <Text style={styles.hintText}>* Mã này giúp bạn mở khóa các tour ẩm thực đặc biệt.</Text>
-        </View> */}
+        </View>
 
         <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
           <Text style={styles.registerButtonText}>Hoàn Tất Đăng Ký</Text>
@@ -92,7 +105,9 @@ export default function RegisterScreen({ navigation }) {
           style={styles.footer} 
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.footerText}>Đã có tài khoản? <Text style={styles.signInText}>Quay lại Đăng nhập</Text></Text>
+          <Text style={styles.footerText}>
+            Đã có tài khoản? <Text style={styles.signInText}>Quay lại Đăng nhập</Text>
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -116,11 +131,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#EEEEEE",
   },
-  highlightInput: {
-    borderColor: "#FFB300",
-    backgroundColor: "#FFFDE7", // Tô vàng nhẹ cho ô nhập mã code
-  },
-  hintText: { fontSize: 11, color: "#757575", marginTop: 4, fontStyle: "italic" },
   registerButton: {
     backgroundColor: "#FF6F00",
     borderRadius: 10,
