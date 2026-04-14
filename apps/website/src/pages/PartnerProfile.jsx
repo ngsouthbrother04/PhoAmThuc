@@ -85,6 +85,8 @@ export default function PartnerProfile() {
 
   const [isPoiModalOpen, setIsPoiModalOpen] = useState(false);
   const [editingPoiId, setEditingPoiId] = useState(null);
+  const [editingOriginalDescription, setEditingOriginalDescription] =
+    useState("");
   const [pointName, setPointName] = useState("");
   const [pointDescription, setPointDescription] = useState("");
   const [pointCategory, setPointCategory] = useState("FOOD");
@@ -140,6 +142,7 @@ export default function PartnerProfile() {
     setAudioError("");
     setSelectedAudioLanguage("auto");
     setEditingPoiId(null);
+    setEditingOriginalDescription("");
   };
 
   const openCreatePoiModal = () => {
@@ -149,13 +152,15 @@ export default function PartnerProfile() {
 
   const openEditPoiModal = (item) => {
     resetPoiForm();
+    const nextDescription =
+      item?.description?.vi ||
+      item?.description?.en ||
+      pickLocalized(item.description);
+
     setEditingPoiId(item.id);
     setPointName(item?.name?.vi || item?.name?.en || pickLocalized(item.name));
-    setPointDescription(
-      item?.description?.vi ||
-        item?.description?.en ||
-        pickLocalized(item.description),
-    );
+    setPointDescription(nextDescription);
+    setEditingOriginalDescription(nextDescription);
     setPointCategory(item?.type || "FOOD");
     setLatitudeInput(String(item?.latitude ?? ""));
     setLongitudeInput(String(item?.longitude ?? ""));
@@ -350,9 +355,14 @@ export default function PartnerProfile() {
       return;
     }
 
+    const hasDescriptionChanged =
+      !isEditingPoi || trimmedDescription !== editingOriginalDescription.trim();
+
     const payload = {
       name: { vi: trimmedName },
-      description: { vi: trimmedDescription },
+      ...(hasDescriptionChanged
+        ? { description: { vi: trimmedDescription } }
+        : {}),
       type: pointCategory,
       latitude,
       longitude,
