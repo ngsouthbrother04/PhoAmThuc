@@ -2,7 +2,8 @@
 
 Source: `apps/backend/src/routes/api/auth.ts`, `apps/backend/src/routes/api/pois.ts`, `apps/backend/src/routes/api/tours.ts`, `apps/backend/src/routes/api/sync.ts`, `apps/backend/src/routes/api/users.ts`, `apps/backend/src/routes/api/partner.ts`, `apps/backend/src/routes/api/admin.ts`, `apps/backend/src/routes/api/analytics.ts`
 
-## USER
+## USER (Khách hàng / Foodie)
+Sơ đồ hoạt động của Người dùng với mô hình tương tác "Tap-to-play".
 
 ```mermaid
 flowchart TD
@@ -11,19 +12,25 @@ flowchart TD
     C -- "Yêu cầu Login" --> D["Đăng nhập / Đăng ký"]
     D --> C
     
-    C -- "Đã có Token" --> E["API Sync: Tải bản đồ <br>& POI xung quanh"]
+    C -- "Đã có Token" --> E["API Sync: Tải bản đồ & POIs xung quanh"]
     
-    E --> F{"Thiết bị cấp quyền?"}
-    F -- "Từ chối" --> G["Hiển thị Bản đồ mặc định"]
-    F -- "Cho GPS/Camera" --> H["Phát hiện vị trí (Blue Dot)<br>/ Sẵn sàng Camera"]
+    E --> F{"Bật GPS?"}
+    F -- "Từ chối" --> G["Yêu cầu cấp quyền"]
+    G --> F
+    F -- "Có" --> H["Phát hiện vị trí (Blue Dot) & Sẵn sàng Camera"]
     
-    G --> I{"Người dùng thao tác?"}
-    H --> I
+    H --> I{"Người dùng thao tác?"}
     
-    I -- "Chạm POI trên map" --> J["Xem chi tiết POI <br>(Bottom Sheet)"]
+    I -- "Chạm POI trên map" --> J["Xem chi tiết POI (Bottom Sheet)"]
     I -- "Quét mã QR tại quán" --> K["Giải mã QR lấy POI ID"]
-    I -- "Xem danh sách Tour" --> L["Chọn Food Tour <br> & Xem POI thứ tự"]
-    I -- "Đổi ngôn ngữ" --> M["API: Tải dữ liệu nội dung mới"]
+    I -- "Xem danh sách Tour" --> L["Chọn Food Tour & Xem POI thứ tự"]
+    I -- "Đổi ngôn ngữ (Ngoại ngữ)" --> U{"Tài khoản Premium?"}
+    
+    U -- "Chưa" --> W["Hiển thị Yêu cầu Mua gói (Packages)"]
+    W --> X["Thực hiện thanh toán (MoMo / VNPay)"]
+    X --> Y["Webhook Server xác thực giao dịch thành công"]
+    Y --> U
+    U -- "Rồi" --> M["API: Tải dữ liệu nội dung mới"]
     
     K --> J
     L --> J
@@ -33,35 +40,38 @@ flowchart TD
     N -- "Không" --> I
     N -- "Có" --> O{"Đang có Audio khác?"}
     
-    O -- "Có phát" --> P["DỪNG Audio cũ <br>(Single Voice Rule)"]
+    O -- "Có phát" --> P["DỪNG Audio cũ (Single Voice Rule)"]
     O -- "Không phát" --> Q["Tải MP3 từ /api/v1/pois"]
     P --> Q
     
-    Q --> R["Bắt đầu Phát & <br> Mở Mini Player điều khiển"]
+    Q --> R["Bắt đầu Phát & Mở Mini Player điều khiển"]
     R --> S["Gửi dữ liệu Analytics xuống DB"]
     S --> T([Kết thúc])
     
-    %% Style adjustments
-    classDef startend fill:#d8e5ff,stroke:#6685cc,stroke-width:2px;
-    classDef condition fill:#ffe5d8,stroke:#cc8066,stroke-width:2px;
+    %% Style adjustments for Purple Theme matching attached image
+    classDef default fill:#EAE4FF,stroke:#B29AF8,stroke-width:1.5px,color:#333;
+    classDef startend fill:#FFFFFF,stroke:#B29AF8,stroke-width:2px,color:#333;
+    classDef decision fill:#EAE4FF,stroke:#B29AF8,stroke-width:1.5px,color:#333;
+    
     class A,T startend;
-    class C,F,I,N,O condition;
+    class C,F,I,N,O,U decision;
 ```
 
-## PARTNER
+## PARTNER (Đối tác / Chủ quán)
+Sơ đồ hoạt động từ việc đăng nhập Dashboard để quản lý địa điểm POI và Tour tuyến độc quyền.
 
 ```mermaid
 flowchart TD
     A([Bắt đầu]) --> B["Đăng nhập Portal"]
     B --> C{"Verify Role?"}
-    C -- "Trượt" --> D["Báo lỗi Auth"]
+    C -- "Trượt" --> D["Báo lỗi Auth & Từ chối truy cập"]
     
     C -- "Hợp lệ (PARTNER)" --> E["Hiển thị Dashboard Quản lý"]
     
     E --> F{"Chọn hạng mục?"}
-    F -- "Quản lý POI" --> G["Tạo mới / Sửa / Xóa <br> Thông tin Quán"]
+    F -- "Quản lý POI" --> G["Tạo mới / Sửa / Xóa Thông tin Quán"]
     F -- "Quản lý Food Tour" --> H["Tạo Lộ trình Tour Tùy chỉnh"]
-    F -- "Quản lý Media" --> I["Upload Banner / Hình ảnh <br> (Tải lên /api/v1/partner/..)"]
+    F -- "Quản lý Media" --> I["Upload Banner / Hình ảnh (Tải lên /api/v1/partner/..)"]
     
     G --> J["Hệ thống Validation Schema"]
     H --> J
@@ -71,52 +81,60 @@ flowchart TD
     K -- "Không" --> L["Cảnh báo Lỗi Nhập liệu"]
     L --> F
     
-    K -- "Có" --> M["Lưu vào Database & <br>Đẩy Record vào Trạng Thái Chờ"]
-    M --> N["Gửi Notification Registration Request"]
-    N --> P([Kết thúc phiên thao tác])
-    
+    K -- "Có" --> M["Lưu vào Database & Đẩy Record vào Trạng Thái Chờ"]
+    M --> N["Gửi Notification Request chờ Admin duyệt"]
+    N --> P([Kết thúc])
     D --> P
     
-    classDef startend fill:#d8e5ff,stroke:#6685cc,stroke-width:2px;
-    classDef condition fill:#ffe5d8,stroke:#cc8066,stroke-width:2px;
+    %% Style adjustments for Purple Theme
+    classDef default fill:#EAE4FF,stroke:#B29AF8,stroke-width:1.5px,color:#333;
+    classDef startend fill:#FFFFFF,stroke:#B29AF8,stroke-width:2px,color:#333;
+    classDef decision fill:#EAE4FF,stroke:#B29AF8,stroke-width:1.5px,color:#333;
+    
     class A,P startend;
-    class C,F,K condition;
+    class C,F,K decision;
 ```
 
-## ADMIN
+## ADMIN (Quản trị viên)
+Sơ đồ vận hành toàn quyền của Quản trị viên, bao gồm việc duyệt yêu cầu Partner, đồng bộ hệ thống và phân quyền.
 
 ```mermaid
 flowchart TD
     A([Bắt đầu]) --> B["Đăng nhập CMS Nền tảng"]
     B --> C{"Verify Role?"}
-    C -- "Trượt" --> D["Báo lỗi <br> Insufficient Permissions"]
+    C -- "Trượt" --> D["Báo lỗi Insufficient Permissions"]
     
     C -- "Hợp lệ (ADMIN)" --> E["Hiển thị Bảng điều khiển Tổng quan"]
     
     E --> F{"Chọn Nghiệp vụ?"}
-    F -- "Kiểm duyệt Partner" --> G["Xem Danh sách / Requests <br> chờ duyệt"]
-    F -- "Quản lý Data POI/Tour" --> H["Chỉnh sửa Master File <br> / Publish Nội dung"]
-    F -- "Phân quyền User" --> I["Gán Role USER/PARTNER/ADMIN"]
-    F -- "Vận hành Hệ thống" --> J["Gửi Lệnh Sync / Invalidate Cache <br> Queue Logs"]
+    F -- "Kiểm duyệt Partner" --> G["Xem Danh sách Yêu cầu chờ duyệt"]
+    F -- "Quản lý Data POI/Tour" --> H["Chỉnh sửa Master File / Publish Nội dung"]
+    F -- "Phân quyền User" --> I["Gán Role (USER / PARTNER / ADMIN)"]
+    F -- "Vận hành Hệ thống" --> J["Gửi Lệnh Sync / Invalidate Cache / Xem Logs"]
+    F -- "Quản lý Gói Thanh Toán" --> V["Tạo / Sửa / Xóa cấu hình Payment Packages"]
     
-    G --> K{"Hành động duyệt?"}
-    K -- "Chấp thuận" --> L["Cập nhật Status Active <br> cho Nội dung Partner"]
-    K -- "Từ chối" --> M["Gửi Lý do từ chối"]
+    G --> K{"Duyệt Yêu Cầu?"}
+    K -- "Chấp thuận" --> L["Cập nhật Status Active cho Nội dung"]
+    K -- "Từ chối" --> M["Gửi Lý do từ chối cho Partner"]
     
     H --> N{"Yêu cầu xuất bản?"}
-    N -- "Ghi đè TTS" --> O["Kích hoạt Background Job <br> Sinh Audio/Thuyết minh tự động"]
+    N -- "Ghi đè TTS" --> O["Kích hoạt Background Job Sinh Audio Tự động"]
     N -- "Chỉ đổi Text" --> P["Cập nhật JSONB Translations"]
     
-    L --> Q([Hoàn tất & Kết thúc])
+    L --> Q([Kết thúc])
     M --> Q
     O --> Q
     P --> Q
     I --> Q
     J --> Q
-    D --> Q([Kết thúc])
+    V --> Q
+    D --> Q
     
-    classDef startend fill:#e5ffd8,stroke:#66cc66,stroke-width:2px;
-    classDef condition fill:#ffe5d8,stroke:#cc8066,stroke-width:2px;
+    %% Style adjustments for Purple Theme
+    classDef default fill:#EAE4FF,stroke:#B29AF8,stroke-width:1.5px,color:#333;
+    classDef startend fill:#FFFFFF,stroke:#B29AF8,stroke-width:2px,color:#333;
+    classDef decision fill:#EAE4FF,stroke:#B29AF8,stroke-width:1.5px,color:#333;
+    
     class A,Q startend;
-    class C,F,K,N condition;
+    class C,F,K,N decision;
 ```

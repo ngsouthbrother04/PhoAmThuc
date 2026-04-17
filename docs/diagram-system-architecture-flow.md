@@ -2,18 +2,20 @@
 
 Source: `apps/backend/src/index.ts`, route files, service files
 
-## USER
+## USER (Khách hàng / Foodie)
 
 ```mermaid
 flowchart LR
-    subgraph "Client Layer"
-        U["Web/App Client <br>(Foodie)"]
+    %% Subgraphs representing the boxes in the image
+    subgraph Client ["Client Layer"]
+        direction LR
+        U(("Foodie<br>(User)")) <--> W["Web / App UI"]
     end
 
-    subgraph "Application Layer (Node.js API)"
-        API["API Gateway / Express.js"]
-        
-        AuthSVC["Auth & Sync Service"]
+    subgraph Backend ["Backend API Services"]
+        direction TB
+        API["API Gateway"]
+        AuthSVC["Auth & Sync & Payment SVC"]
         POISVC["POI & Tour Service"]
         AnaSVC["Analytics Service"]
         
@@ -22,106 +24,132 @@ flowchart LR
         API --> AnaSVC
     end
 
-    subgraph "Data & Storage Layer"
-        DB[("PostgreSQL <br>(JSONB, PostGIS)")]
-        FS[("Local File System <br>(public/audio)")]
+    subgraph DB ["Data Pipeline & Storage"]
+        direction TB
+        PG[("PostgreSQL<br>(Master DB)")]
+        FS[("File Storage<br>(MP3 Audio)")]
     end
+    
+    PaymentGateway["Payment Gateway<br>(MoMo / VNPay)"]
 
-    U -- "REST API (HTTPS)" --> API
+    W -- "HTTPS API Requests" --> API
+    W -- "Redirect Payment" --> PaymentGateway
+    PaymentGateway -- "Webhook IPN Callback" --> API
+
+    AuthSVC -- "Query/Save Session / Payment Logs" --> PG
+    POISVC -- "Query Location Data" --> PG
+    AnaSVC -- "Log Tracking Events" --> PG
     
-    AuthSVC -- "Query / Save Session" --> DB
-    POISVC -- "Query Location Data" --> DB
-    AnaSVC -- "Log Tracking Events" --> DB
+    W <-- "Stream/Download MP3" --> FS
+
+    %% CSS matches Orange (Client), Blue (Backend), Green (DB)
+    classDef client fill:#FFF0E6,stroke:#FF9955,stroke-width:1.5px,color:#333;
+    classDef backend fill:#EAF3FF,stroke:#66A3FF,stroke-width:1.5px,color:#333;
+    classDef database fill:#EAF7E8,stroke:#66CC66,stroke-width:1.5px,color:#333;
+    classDef external fill:#F3F4F6,stroke:#9CA3AF,stroke-width:1.5px,color:#333,stroke-dasharray: 4 4;
+
+    class U,W client;
+    class API,AuthSVC,POISVC,AnaSVC backend;
+    class PG,FS database;
+    class PaymentGateway external;
     
-    FS -- "Serve MP3 Static Files" --> U
-    
-    classDef client fill:#d8e5ff,stroke:#6685cc,stroke-width:2px
-    classDef app fill:#e5ffd8,stroke:#66cc66,stroke-width:2px
-    classDef db fill:#ffe5d8,stroke:#cc8066,stroke-width:2px
-    class U client
-    class API,AuthSVC,POISVC,AnaSVC app
-    class DB,FS db
+    style Client fill:#FFF9F5,stroke:#FF9955,stroke-width:2px,color:#333,stroke-dasharray: 5 5
+    style Backend fill:#F5FAFF,stroke:#66A3FF,stroke-width:2px,color:#333,stroke-dasharray: 5 5
+    style DB fill:#F5FCF5,stroke:#66CC66,stroke-width:2px,color:#333,stroke-dasharray: 5 5
 ```
 
-## PARTNER
+## PARTNER (Đối tác / Chủ quán)
 
 ```mermaid
 flowchart LR
-    subgraph "Client Layer"
-        P["Partner Dashboard <br>(Chủ quán)"]
+    subgraph Client ["Partner Portal Application"]
+        direction LR
+        P(("Partner")) <--> W["Web Dashboard UI"]
     end
 
-    subgraph "Application Layer (Node.js API)"
-        API["API Gateway / Express.js"]
-        
-        AuthSVC["Auth Middleware <br>(Role: PARTNER)"]
-        PartnerSVC["Partner Registration <br>& POI Service"]
+    subgraph Backend ["Backend API Services"]
+        direction TB
+        AuthSVC["Auth Middleware"]
+        PartnerSVC["Partner / POI Service"]
         UploadSVC["Media Upload Service"]
         
-        API --> AuthSVC
         AuthSVC --> PartnerSVC
         AuthSVC --> UploadSVC
     end
 
-    subgraph "Data & Storage Layer"
-        DB[("PostgreSQL <br>(Lưu Bản Nháp / Yêu cầu)")]
-        Cloudinary[("Cloudinary <br>(Lưu trữ Hình ảnh CDN)")]
+    subgraph DB ["Data Pipeline & Storage"]
+        direction TB
+        PG[("PostgreSQL<br>(Drafts/Requests)")]
+        CDN[("Cloudinary<br>(CDN)")]
     end
 
-    P -- "Submit Form / APIs" --> API
+    W -- "Submit Form/APIs" --> AuthSVC
+
+    PartnerSVC -- "Save Drafts / Events" --> PG
+    UploadSVC -- "Upload Image" --> CDN
+
+    %% Styling
+    classDef client fill:#FFF0E6,stroke:#FF9955,stroke-width:1.5px,color:#333;
+    classDef backend fill:#EAF3FF,stroke:#66A3FF,stroke-width:1.5px,color:#333;
+    classDef database fill:#EAF7E8,stroke:#66CC66,stroke-width:1.5px,color:#333;
+
+    class P,W client;
+    class AuthSVC,PartnerSVC,UploadSVC backend;
+    class PG,CDN database;
     
-    PartnerSVC -- "Save Drafts / Requests" --> DB
-    UploadSVC -- "Upload Banner/Menu" --> Cloudinary
-    
-    classDef client fill:#d8e5ff,stroke:#6685cc,stroke-width:2px
-    classDef app fill:#e5ffd8,stroke:#66cc66,stroke-width:2px
-    classDef db fill:#ffe5d8,stroke:#cc8066,stroke-width:2px
-    class P client
-    class API,AuthSVC,PartnerSVC,UploadSVC app
-    class DB,Cloudinary db
+    style Client fill:#FFF9F5,stroke:#FF9955,stroke-width:2px,color:#333,stroke-dasharray: 5 5
+    style Backend fill:#F5FAFF,stroke:#66A3FF,stroke-width:2px,color:#333,stroke-dasharray: 5 5
+    style DB fill:#F5FCF5,stroke:#66CC66,stroke-width:2px,color:#333,stroke-dasharray: 5 5
 ```
 
-## ADMIN
+## ADMIN (Quản trị viên)
 
 ```mermaid
 flowchart LR
-    subgraph "Client Layer"
-        A["Admin CMS <br>(Quản trị viên / Hệ thống)"]
+    subgraph Client ["Admin CMS Application"]
+        direction LR
+        A(("Admin")) <--> W["Admin UI"]
     end
 
-    subgraph "Application Layer (Node.js API)"
-        API["API Gateway / Express.js"]
+    subgraph Backend ["Backend API Services"]
+        direction TB
+        AuthSVC["Auth Middleware"]
+        AdminSVC["Admin / POI Master SVC"]
+        TTSSVC["TTS Generator Service"]
+        UserSVC["Role Mgt Service"]
+        PaymentAdminSVC["Payment Package"]
         
-        AuthSVC["Auth Middleware <br>(Role: ADMIN)"]
-        AdminSVC["Admin Approvals <br>& Core POI Master"]
-        TTSSVC["TTS Generator Service <br>(Worker)"]
-        UserSVC["User & Role Management"]
-        
-        API --> AuthSVC
         AuthSVC --> AdminSVC
         AuthSVC --> TTSSVC
         AuthSVC --> UserSVC
+        AuthSVC --> PaymentAdminSVC
     end
 
-    subgraph "Data & Storage Layer"
-        DB[("PostgreSQL <br>(Core/Master Data)")]
-        Redis[("Redis <br>(Background Jobs Queue)")]
-        FS[("Local File System <br>(public/audio)")]
-        Cloudinary[("Cloudinary <br>(Lưu trữ Hình ảnh CDN)")]
+    subgraph DB ["Data Pipeline & Storage"]
+        direction TB
+        PG[("PostgreSQL<br>(Master Data)")]
+        Redis[("Redis<br>(Job Queue)")]
+        FS[("File System<br>(Audio Outputs)")]
     end
 
-    A -- "Manage System via HTTPS" --> API
+    W -- "HTTPS / GraphQL" --> AuthSVC
+
+    AdminSVC -- "Approve & Publish" --> PG
+    TTSSVC -- "Push Jobs" --> Redis
+    TTSSVC -- "Save Result" --> FS
+    UserSVC -- "Update Grants" --> PG
+    PaymentAdminSVC -- "Config Packages" --> PG
+
+    %% Styling
+    classDef client fill:#FFF0E6,stroke:#FF9955,stroke-width:1.5px,color:#333;
+    classDef backend fill:#EAF3FF,stroke:#66A3FF,stroke-width:1.5px,color:#333;
+    classDef database fill:#EAF7E8,stroke:#66CC66,stroke-width:1.5px,color:#333;
+
+    class A,W client;
+    class AuthSVC,AdminSVC,TTSSVC,UserSVC,PaymentAdminSVC backend;
+    class PG,Redis,FS database;
     
-    AdminSVC -- "Approve & Publish" --> DB
-    AdminSVC -- "Cleanup Media" --> Cloudinary
-    TTSSVC -- "Push / Consume Job" --> Redis
-    TTSSVC -- "Save MP3 Results" --> FS
-    UserSVC -- "Update Grants" --> DB
-    
-    classDef client fill:#d8e5ff,stroke:#6685cc,stroke-width:2px
-    classDef app fill:#e5ffd8,stroke:#66cc66,stroke-width:2px
-    classDef db fill:#ffe5d8,stroke:#cc8066,stroke-width:2px
-    class A client
-    class API,AuthSVC,AdminSVC,TTSSVC,UserSVC app
-    class DB,Redis,FS,Cloudinary db
+    style Client fill:#FFF9F5,stroke:#FF9955,stroke-width:2px,color:#333,stroke-dasharray: 5 5
+    style Backend fill:#F5FAFF,stroke:#66A3FF,stroke-width:2px,color:#333,stroke-dasharray: 5 5
+    style DB fill:#F5FCF5,stroke:#66CC66,stroke-width:2px,color:#333,stroke-dasharray: 5 5
 ```
