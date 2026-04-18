@@ -31,12 +31,14 @@ flowchart LR
     end
     
     PaymentGateway["Payment Gateway<br>(MoMo / VNPay)"]
+    EmailService["Email Service<br>(SMTP / Mail server)"]
 
     W -- "HTTPS API Requests" --> API
     W -- "Redirect Payment" --> PaymentGateway
     PaymentGateway -- "Webhook IPN Callback" --> API
 
     AuthSVC -- "Query/Save Session / Payment Logs" --> PG
+    AuthSVC -- "Gửi OTP Email" --> EmailService
     POISVC -- "Query Location Data" --> PG
     AnaSVC -- "Log Tracking Events" --> PG
     
@@ -51,7 +53,7 @@ flowchart LR
     class U,W client;
     class API,AuthSVC,POISVC,AnaSVC backend;
     class PG,FS database;
-    class PaymentGateway external;
+    class PaymentGateway,EmailService external;
     
     style Client fill:#FFF9F5,stroke:#FF9955,stroke-width:2px,color:#333,stroke-dasharray: 5 5
     style Backend fill:#F5FAFF,stroke:#66A3FF,stroke-width:2px,color:#333,stroke-dasharray: 5 5

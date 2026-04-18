@@ -17,9 +17,16 @@ flowchart LR
             UC3(["Gửi yêu cầu nâng cấp Role (Partner)"])
             UC10(["Nâng cấp Tài khoản Premium"])
             UC11(["Thanh toán qua MoMo / VNPay"])
+            UC12(["Quên mật khẩu"])
+            UC13(["Gửi OTP qua Email"])
+            UC14(["Xác thực OTP"])
+            UC15(["Đặt lại mật khẩu"])
             
             UC1 -. "«extend»" .-> UC2
             UC10 -. "«include»" .-> UC11
+            UC12 -. "«include»" .-> UC13
+            UC12 -. "«include»" .-> UC14
+            UC12 -. "«include»" .-> UC15
         end
 
         subgraph Group2 ["Khám Phá & Trải Nghiệm"]
@@ -49,12 +56,13 @@ flowchart LR
     USER --- UC8
     USER --- UC9
     USER --- UC10
+    USER --- UC12
 
     %% Styling matches the reference image
     classDef actor fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#000
     classDef usecase fill:#EEF6FF,stroke:#B2D4FF,stroke-width:1.5px,color:#333
     class USER actor
-    class UC1,UC2,UC3,UC4,UC5,UC6,UC7,UC8,UC9,UC10,UC11 usecase
+    class UC1,UC2,UC3,UC4,UC5,UC6,UC7,UC8,UC9,UC10,UC11,UC12,UC13,UC14,UC15 usecase
     
     style System fill:transparent,stroke:#333,stroke-width:1px,color:#333
     style Group1 fill:transparent,stroke:#888,stroke-width:1px,color:#333,stroke-dasharray: 5 5
