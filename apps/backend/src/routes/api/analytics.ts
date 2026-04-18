@@ -1,7 +1,15 @@
-import { Router } from 'express';
-import { processBatchEvents, processPresenceHeartbeat, getAnalyticsStats } from '../../services/analyticsService';
-import { requireAuth, requireRole } from '../../middlewares/authMiddleware';
-import asyncHandler from '../../utils/asyncHandler';
+import { Router } from "express";
+import {
+  processBatchEvents,
+  processPresenceHeartbeat,
+  getAnalyticsStats,
+} from "../../services/analyticsService";
+import {
+  requireAuth,
+  requireRole,
+  AuthRequest,
+} from "../../middlewares/authMiddleware";
+import asyncHandler from "../../utils/asyncHandler";
 
 const router = Router();
 
@@ -18,20 +26,21 @@ const router = Router();
  * @return {object} 500 - Internal Server Error
  */
 router.post(
-  '/events',
+  "/events",
   requireAuth,
-  requireRole(['USER']),
+  requireRole(["USER"]),
   asyncHandler(async (req, res) => {
     const { events } = req.body;
 
     const processedCount = await processBatchEvents(events);
 
     return res.status(200).json({
-      status: 'success',
+      status: "success",
       processedCount,
-      failedCount: (!events || !Array.isArray(events)) ? 0 : (events.length - processedCount)
+      failedCount:
+        !events || !Array.isArray(events) ? 0 : events.length - processedCount,
     });
-  })
+  }),
 );
 
 /**
@@ -48,17 +57,36 @@ router.post(
  * @return {object} 500 - Internal Server Error
  */
 router.post(
-  '/presence/heartbeat',
+  "/presence/heartbeat",
   requireAuth,
-  requireRole(['USER']),
-  asyncHandler(async (req, res) => {
-    const result = await processPresenceHeartbeat(req.body);
+  requireRole(["USER"]),
+  asyncHandler(async (req: AuthRequest, res) => {
+    const sessionId =
+      typeof req.user?.sid === "string" && req.user.sid.trim()
+        ? req.user.sid.trim()
+        : typeof req.body?.sessionId === "string"
+          ? req.body.sessionId.trim()
+          : "";
+    const deviceId =
+      typeof req.body?.deviceId === "string" ? req.body.deviceId.trim() : "";
+    const language =
+      typeof req.body?.language === "string"
+        ? req.body.language.trim()
+        : undefined;
+    const timestamp = Number(req.body?.timestamp);
+
+    const result = await processPresenceHeartbeat({
+      deviceId,
+      sessionId,
+      language,
+      timestamp: Number.isFinite(timestamp) ? timestamp : Date.now(),
+    });
 
     return res.status(200).json({
-      status: 'success',
-      ...result
+      status: "success",
+      ...result,
     });
-  })
+  }),
 );
 
 /**
@@ -71,17 +99,17 @@ router.post(
  * @return {object} 500 - Internal Server Error
  */
 router.get(
-  '/stats',
+  "/stats",
   requireAuth,
-  requireRole(['ADMIN']),
+  requireRole(["ADMIN"]),
   asyncHandler(async (req, res) => {
     const stats = await getAnalyticsStats();
 
     return res.status(200).json({
-      status: 'success',
-      data: stats
+      status: "success",
+      data: stats,
     });
-  })
+  }),
 );
 
 export default router;

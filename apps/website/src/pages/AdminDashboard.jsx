@@ -43,6 +43,12 @@ const statCards = [
     icon: CircleDollarSign,
     gradient: "from-cyan-500 to-sky-500",
   },
+  {
+    key: "onlineUsers",
+    title: "Người đang online",
+    icon: Gauge,
+    gradient: "from-emerald-500 to-lime-500",
+  },
 ];
 
 function getPartnerRegistrationTone(status) {
@@ -281,6 +287,13 @@ export default function AdminDashboard() {
   const [adminPois, setAdminPois] = useState([]);
   const [adminUsers, setAdminUsers] = useState([]);
   const [paymentPackages, setPaymentPackages] = useState([]);
+  const [analyticsStats, setAnalyticsStats] = useState({
+    plays: 0,
+    qrScans: 0,
+    topPois: [],
+    onlineSessions: 0,
+    onlineWindowSec: 90,
+  });
   const [partnerRegistrationRequests, setPartnerRegistrationRequests] =
     useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -360,6 +373,7 @@ export default function AdminDashboard() {
         fetchJson("/api/v1/admin/payment-packages?includeInactive=true", {
           headers: adminHeaders,
         }),
+        fetchJson("/api/v1/analytics/stats", { headers: adminHeaders }),
       ]);
 
       const errors = [];
@@ -392,6 +406,19 @@ export default function AdminDashboard() {
       } else {
         setPaymentPackages([]);
         errors.push(`Payment packages: ${adminRequests[3].reason.message}`);
+      }
+
+      if (adminRequests[4].status === "fulfilled") {
+        setAnalyticsStats(adminRequests[4].value.data ?? {});
+      } else {
+        setAnalyticsStats({
+          plays: 0,
+          qrScans: 0,
+          topPois: [],
+          onlineSessions: 0,
+          onlineWindowSec: 90,
+        });
+        errors.push(`Analytics: ${adminRequests[4].reason.message}`);
       }
 
       if (!cancelled) {
@@ -984,6 +1011,14 @@ export default function AdminDashboard() {
         delta: paymentPackages.length
           ? `${formatNumber(paymentPackages.length)} gói đã cấu hình`
           : "Chưa có gói giá",
+      };
+    }
+
+    if (card.key === "onlineUsers") {
+      return {
+        ...card,
+        value: formatNumber(analyticsStats.onlineSessions || 0),
+        delta: `Heartbeat trong ${formatNumber(analyticsStats.onlineWindowSec || 90)} giây gần nhất`,
       };
     }
 
