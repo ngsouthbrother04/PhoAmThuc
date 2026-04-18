@@ -7,6 +7,8 @@ import { buildSeedDataset } from "../src/services/seedService";
 const prisma = new PrismaClient();
 
 async function main() {
+  const shouldPruneExistingData =
+    process.env.SEED_PRUNE_EXISTING_DATA === "true";
   const adminEmail = "admin@phoamthuc.local";
   const partnerEmail = "partner@phoamthuc.local";
   const sharedPassword = "123321az";
@@ -53,38 +55,40 @@ async function main() {
       },
     });
 
-    await tx.analyticsEvent.deleteMany({
-      where: {
-        OR: [
-          {
-            poiId: {
-              notIn: poiIds,
+    if (shouldPruneExistingData) {
+      await tx.analyticsEvent.deleteMany({
+        where: {
+          OR: [
+            {
+              poiId: {
+                notIn: poiIds,
+              },
             },
-          },
-          {
-            sessionId: {
-              startsWith: "seed-session-",
+            {
+              sessionId: {
+                startsWith: "seed-session-",
+              },
             },
+          ],
+        },
+      });
+
+      await tx.tour.deleteMany({
+        where: {
+          id: {
+            notIn: tourIds,
           },
-        ],
-      },
-    });
-
-    await tx.tour.deleteMany({
-      where: {
-        id: {
-          notIn: tourIds,
         },
-      },
-    });
+      });
 
-    await tx.pointOfInterest.deleteMany({
-      where: {
-        id: {
-          notIn: poiIds,
+      await tx.pointOfInterest.deleteMany({
+        where: {
+          id: {
+            notIn: poiIds,
+          },
         },
-      },
-    });
+      });
+    }
 
     for (const poi of dataset.pois) {
       await tx.pointOfInterest.upsert({
@@ -148,9 +152,19 @@ async function main() {
       });
     }
 
-    await tx.analyticsEvent.createMany({
-      data: dataset.analyticsEvents,
+    const existingSeedAnalyticsCount = await tx.analyticsEvent.count({
+      where: {
+        sessionId: {
+          startsWith: "seed-session-",
+        },
+      },
     });
+
+    if (shouldPruneExistingData || existingSeedAnalyticsCount === 0) {
+      await tx.analyticsEvent.createMany({
+        data: dataset.analyticsEvents,
+      });
+    }
 
     void adminUser;
   });
@@ -158,6 +172,10 @@ async function main() {
   console.log("Seeded accounts:");
   console.log("ADMIN:", { email: adminEmail, password: sharedPassword });
   console.log("PARTNER:", { email: partnerEmail, password: sharedPassword });
+  console.log(
+    "Seed mode:",
+    shouldPruneExistingData ? "prune-existing-data" : "non-destructive",
+  );
 }
 
 main()
