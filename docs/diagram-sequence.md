@@ -170,7 +170,7 @@ sequenceDiagram
     A->>CMS: Mở Dashboard Analytics
     CMS->>Core: GET /api/v1/analytics/stats
     Core->>Core: requireAuth + requireRole(["ADMIN"])
-    Core->>DB: COUNT DISTINCT session_id từ analytics_presence trong cửa sổ 90s
+    Core->>DB: COUNT DISTINCT session_id từ analytics_presence
     DB-->>Core: onlineSessions
     Core-->>CMS: 200 OK (data analytics stats)
     CMS-->>A: Hiển thị KPI vận hành
