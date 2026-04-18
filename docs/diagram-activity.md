@@ -12,6 +12,16 @@ flowchart TD
     C -- "Yêu cầu Login" --> D["Đăng nhập / Đăng ký"]
     D --> C
     
+    D -- "Quên mật khẩu" --> FP1["Nhập email"]
+    FP1 --> FP2["Gửi OTP"]
+    FP2 --> FP3["Nhận OTP"]
+    FP3 --> FP4["Nhập OTP"]
+    FP4 --> FP5{"OTP đúng?"}
+    FP5 -- "No (Báo lỗi)" --> FP4
+    FP5 -- "Yes" --> FP6["Nhập mật khẩu mới"]
+    FP6 --> FP7["Thành công"]
+    FP7 --> D
+    
     C -- "Đã có Token" --> E["API Sync: Tải bản đồ & POIs xung quanh"]
     
     E --> F{"Bật GPS?"}
@@ -54,7 +64,7 @@ flowchart TD
     classDef decision fill:#EAE4FF,stroke:#B29AF8,stroke-width:1.5px,color:#333;
     
     class A,T startend;
-    class C,F,I,N,O,U decision;
+    class C,F,I,N,O,U,FP5 decision;
 ```
 
 ## PARTNER (Đối tác / Chủ quán)

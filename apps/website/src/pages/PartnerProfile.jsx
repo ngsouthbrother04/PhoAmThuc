@@ -70,6 +70,12 @@ function getLastQueryValue(searchParams, key) {
   return values[values.length - 1] || "";
 }
 
+function revokeBlobUrl(url) {
+  if (typeof url === "string" && url.startsWith("blob:")) {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export default function PartnerProfile() {
   const { showSuccess, showError } = useToast();
   const token = localStorage.getItem("accessToken");
@@ -142,12 +148,8 @@ export default function PartnerProfile() {
   const isEditingPoi = Boolean(editingPoiId);
 
   const resetPoiForm = () => {
-    if (imagePreviewUrl) {
-      URL.revokeObjectURL(imagePreviewUrl);
-    }
-    if (generatedAudioUrl) {
-      URL.revokeObjectURL(generatedAudioUrl);
-    }
+    revokeBlobUrl(imagePreviewUrl);
+    revokeBlobUrl(generatedAudioUrl);
     setPointName("");
     setPointDescription("");
     setPointCategory("FOOD");
@@ -179,6 +181,8 @@ export default function PartnerProfile() {
       item?.description?.vi ||
       item?.description?.en ||
       pickLocalized(item.description);
+    const existingImageUrl =
+      typeof item?.image === "string" ? item.image.trim() : "";
 
     setEditingPoiId(item.id);
     setPointName(item?.name?.vi || item?.name?.en || pickLocalized(item.name));
@@ -188,17 +192,14 @@ export default function PartnerProfile() {
     setLatitudeInput(String(item?.latitude ?? ""));
     setLongitudeInput(String(item?.longitude ?? ""));
     setRadiusInput(String(item?.radius ?? 120));
+    setImagePreviewUrl(existingImageUrl);
     setIsPoiModalOpen(true);
   };
 
   useEffect(() => {
     return () => {
-      if (imagePreviewUrl) {
-        URL.revokeObjectURL(imagePreviewUrl);
-      }
-      if (generatedAudioUrl) {
-        URL.revokeObjectURL(generatedAudioUrl);
-      }
+      revokeBlobUrl(imagePreviewUrl);
+      revokeBlobUrl(generatedAudioUrl);
     };
   }, [generatedAudioUrl, imagePreviewUrl]);
 
@@ -621,9 +622,7 @@ export default function PartnerProfile() {
   const handlePickImage = (event) => {
     const nextFile = event.target.files?.[0] || null;
 
-    if (imagePreviewUrl) {
-      URL.revokeObjectURL(imagePreviewUrl);
-    }
+    revokeBlobUrl(imagePreviewUrl);
 
     if (!nextFile) {
       setImageFile(null);
@@ -1151,7 +1150,7 @@ export default function PartnerProfile() {
                     <button
                       type="button"
                       onClick={() => {
-                        URL.revokeObjectURL(imagePreviewUrl);
+                        revokeBlobUrl(imagePreviewUrl);
                         setImageFile(null);
                         setImagePreviewUrl("");
                       }}

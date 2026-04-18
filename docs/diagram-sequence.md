@@ -12,6 +12,7 @@ sequenceDiagram
     participant API as Backend API
     participant Pay as Payment Gateway
     participant DB as Database
+    participant EmailService as Email Service
 
     Note over U,DB: 1. Khởi tạo & Cấu hình Cá nhân
     U->>App: Mở ứng dụng / Đăng nhập
@@ -19,6 +20,20 @@ sequenceDiagram
     API->>DB: Đối chiếu thông tin User
     DB-->>API: Trả về Dữ liệu Hợp lệ
     API-->>App: 200 OK (access_token)
+
+    Note over U,DB: 1.5. Sequence 1: Gửi OTP
+    U->>App: User chọn Quên mật khẩu & nhập Email
+    App->>API: Yêu cầu Backend gửi OTP
+    API->>DB: Backend -> Database (lưu OTP)
+    API->>EmailService: Backend -> Email Service (gửi mail)
+    EmailService-->>U: Email -> User (nhận OTP)
+    
+    Note over U,DB: 1.6. Sequence 2: Reset Password (OTP Verification)
+    U->>App: User -> App (Nhập OTP & Mật khẩu mới)
+    App->>API: App -> Backend
+    API->>DB: Backend -> Database (check OTP)
+    API->>DB: Backend -> Database (update password)
+    API-->>App: Backend -> App (Thành công)
 
     Note over U,DB: 2. Tải Bản đồ & Khám phá (Tap-to-play)
     App->>API: GET /api/v1/pois (Sync Cache)
